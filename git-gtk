@@ -1,0 +1,25 @@
+# Before work.
+git pull
+
+# After work.
+git add .
+git commit -m "Commit message"
+git push
+
+git log --oneline # Show commit history in one line per commit.
+git status # Show the status of the working directory.
+git diff # Show changes between commits, commit and working tree, etc.
+
+git restore <file> # Discard changes in working directory.
+git restore . # Discard all changes in working directory.
+
+git branch <branch-name> # Create a new branch.
+git checkout <branch-name> # Switch to a branch.
+git checkout -b <branch-name> # Create and switch to a new branch.
+git merge <branch-name> # Merge a branch into the current branch.
+
+git remote -v # Show remote repositories.
+git remote add origin <repository-url> # Add a new remote repository.
+
+where python # Show the path to the Python executable.
+git --version # Show the installed Git version.
