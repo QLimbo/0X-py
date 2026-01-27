@@ -1,25 +1,101 @@
-# Before work.
-git pull
+# Minimal Git / VS Code cheat sheet
+#
+# Use this as a quick-reference. Add to VS Code as a snippet or keep as a file in your repo.
 
-# After work.
-git add .
-git commit -m "Commit message"
-git push
+# WORKFLOW: update local from remote
+git fetch                 # Download remote changes (safe)
+git pull                  # Fetch + merge (or use `git pull --rebase`)
+git pull --rebase         # Rebase local commits on top of updated remote
 
-git log --oneline # Show commit history in one line per commit.
-git status # Show the status of the working directory.
-git diff # Show changes between commits, commit and working tree, etc.
+# WORKFLOW: start work / finish work
+git branch <name>         # Create a new branch
+git switch <name>         # Switch to branch (newer alternative to checkout)
+git switch -c <name>      # Create and switch to a new branch
+# After work:
+git add <file>            # Stage file
+git add -p                # Stage in interactive hunks
+git commit -m "message"   # Commit staged changes
+git commit --amend        # Amend last commit (if not pushed)
+git push                  # Push current branch
+git push -u origin <name> # Push and set upstream
 
-git restore <file> # Discard changes in working directory.
-git restore . # Discard all changes in working directory.
+# STATUS / LOG / DIFF
+git status                # Show working tree status
+git log --oneline --graph --decorate --all  # Compact history graph
+git show <commit>         # Show one commit
+git diff                  # Unstaged changes
+git diff --staged         # Changes staged for commit
+git blame <file>          # Show who changed each line
 
-git branch <branch-name> # Create a new branch.
-git checkout <branch-name> # Switch to a branch.
-git checkout -b <branch-name> # Create and switch to a new branch.
-git merge <branch-name> # Merge a branch into the current branch.
+# STAGING / RESTORE (safer than checkout)
+git restore <file>                # Discard changes in working directory (untracked files not affected)
+git restore --staged <file>       # Unstage a file
+git checkout -- <file>            # Older form; prefer restore/switch
+# WARNING: destructive
+git reset --hard <commit>         # Reset working tree and index to commit
 
-git remote -v # Show remote repositories.
-git remote add origin <repository-url> # Add a new remote repository.
+# COMMITTING TIPS
+git commit -am "msg"  # Shortcut: stage & commit tracked files only (won't add new files)
+# If you already pushed and want to change published history, be careful:
+git push --force-with-lease  # Safer force-push
 
-where python # Show the path to the Python executable.
-git --version # Show the installed Git version.
+# BRANCHING / MERGING / REBASE
+git merge <branch>             # Merge branch into current
+git rebase -i <base>           # Interactive rebase to squash / reorder / edit commits
+git cherry-pick <commit>       # Apply a single commit to current branch
+
+# UNDO / RECOVERY
+git revert <commit>            # Create a new commit that undoes <commit> (safe for public history)
+git reset --soft <commit>      # Move HEAD, keep changes staged
+git reflog                     # Find lost commits / history of HEAD
+git bisect start/ bad good     # Binary search for problematic commit
+
+# STASH / CLEAN
+git stash                      # Save working state and clean working directory
+git stash pop                  # Apply and remove stash
+git stash list                 # Show saved stashes
+git clean -fd                  # Remove untracked files and directories (dangerous)
+
+# REMOTES / TAGS / MAINTENANCE
+git remote -v                  # Show remotes
+git fetch --prune              # Remove remote-tracking branches that no longer exist
+git tag -a v1.2 -m "release"   # Annotated tag
+git gc                         # Cleanup repository
+git fsck                       # Check repository integrity
+
+# USEFUL INSPECTION
+git show --name-only <commit>  # Files changed by commit
+git log -p -1 <commit>         # Patch for one commit
+git log --stat                 # Summary of changes
+
+# SAFETY NOTES
+# - `git reset --hard` and `git clean -fd` delete work; be sure before running.
+# - `git commit -am` only stages modified tracked files (not new files).
+# - Prefer `git revert` for published commits instead of rewrite.
+
+# VS CODE - quick tips
+# - Source Control view (Ctrl/Cmd+Shift+G) shows changes, staging, commit UI.
+# - Command Palette (Ctrl/Cmd+Shift+P): run "Git: ..." and "GitLens: ..." commands.
+# - Install GitLens for blame, history, file/line annotations, and rich visual diff.
+# - Convert often-used commands to VS Code tasks (tasks.json) or user snippets for even faster use.
+
+# EXAMPLES: common workflows
+# Create feature branch, push, and open PR:
+git switch -c feature/X
+# make changes...
+git add -A
+git commit -m "feat: implement X"
+git push -u origin feature/X
+
+# Rebase local feature onto updated main
+git fetch origin
+git switch feature/X
+git rebase origin/main
+# Resolve conflicts, then:
+git push --force-with-lease
+
+# Recover a deleted commit:
+git reflog
+git switch -c recover <commit-sha>
+
+# End of cheat sheet
