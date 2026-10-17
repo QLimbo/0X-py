@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CT Slice Viewer & Anatomical Glossary (349 Terms)</title>
+    <!-- Optional Tesseract.js for OCR scanning text inside screenshot images -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0d10;
+            --panel-bg: #161920;
+            --panel-border: #262b36;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 20;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .title {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--accent);
+            margin-right: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .plane-tabs {
+            display: inline-flex;
+            background: #0f1217;
+            padding: 3px;
+            border-radius: 7px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .plane-tab {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .plane-tab:hover {
+            color: var(--text-main);
+        }
+
+        .plane-tab.active {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .plane-count {
+            font-size: 11px;
+            opacity: 0.8;
+            font-weight: 500;
+        }
+
+        .btn {
+            background-color: #222733;
+            color: var(--text-main);
+            border: 1px solid #333a4b;
+            padding: 6px 11px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn:hover {
+            background-color: #2d3444;
+            border-color: var(--accent);
+        }
+
+        .btn-primary {
+            background-color: #0369a1;
+            border-color: #0284c7;
+        }
+
+        .btn-primary:hover {
+            background-color: #0284c7;
+        }
+
+        .btn.active {
+            background-color: var(--accent);
+            color: #000;
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-muted);
+            background: #1c2029;
+            padding: 4px 9px;
+            border-radius: 6px;
+            border: 1px solid #262b36;
+        }
+
+        .control-item input[type="range"] {
+            width: 70px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .viewport {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #13161c 0%, #07080a 100%);
+            cursor: grab;
+        }
+
+        .viewport.dragging {
+            cursor: grabbing;
+        }
+
+        .drop-overlay {
+            position: absolute;
+            inset: 20px;
+            border: 2px dashed #334155;
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 28px;
+            background-color: rgba(22, 25, 32, 0.78);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+        }
+
+        .drop-overlay.dragover {
+            border-color: var(--accent);
+            background-color: rgba(56, 189, 248, 0.08);
+        }
+
+        .drop-overlay.hidden {
+            display: none;
+        }
+
+        .drop-icon {
+            font-size: 44px;
+            margin-bottom: 12px;
+        }
+
+        .drop-title {
+            font-size: 19px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .drop-subtitle {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            max-width: 540px;
+            line-height: 1.5;
+            margin-bottom: 18px;
+        }
+
+        .drop-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .shortcuts-box {
+            background: rgba(15, 17, 21, 0.85);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 12px 18px;
+            text-align: left;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.65;
+        }
+
+        .shortcuts-box b {
+            color: var(--text-main);
+        }
+
+        #sliceImage {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transform-origin: center center;
+            will-change: transform, filter;
+            pointer-events: none;
+            display: none;
+        }
+
+        .hud {
+            position: absolute;
+            pointer-events: none;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 12.5px;
+            color: #38bdf8;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
+            line-height: 1.5;
+            z-index: 5;
+        }
+
+        .hud-top-left { top: 12px; left: 14px; }
+        .hud-top-right { top: 12px; right: 14px; text-align: right; color: #94a3b8; }
+        .hud-bottom-left { bottom: 12px; left: 14px; color: #cbd5e1; font-size: 11.5px; }
+
+        .sidebar {
+            width: 400px;
+            background-color: var(--panel-bg);
+            border-left: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            z-index: 15;
+        }
+
+        .sidebar.collapsed {
+            display: none;
+        }
+
+        .sidebar-header {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 6px;
+            position: relative;
+        }
+
+        .search-input {
+            flex: 1;
+            background: #0d0f14;
+            border: 1px solid #2e3545;
+            color: var(--text-main);
+            padding: 7px 28px 7px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            user-select: text;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+        }
+
+        .sidebar-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .pill-btn {
+            background: #1e232d;
+            border: 1px solid #2e3545;
+            color: var(--text-muted);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        .pill-btn:hover {
+            color: var(--text-main);
+            border-color: var(--accent);
+        }
+
+        .pill-btn.active {
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .ocr-status {
+            font-size: 11px;
+            color: #fbbf24;
+            display: none;
+            padding: 4px 8px;
+            background: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            border-radius: 4px;
+        }
+
+        .glossary-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .term-card {
+            background: #11141a;
+            border: 1px solid #222734;
+            border-radius: 6px;
+            padding: 8px 10px;
+            transition: border-color 0.12s;
+            user-select: text;
+        }
+
+        .term-card:hover {
+            border-color: #3b4459;
+        }
+
+        .term-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .term-lat {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        .pin-btn {
+            background: #1d222c;
+            border: 1px solid #303746;
+            color: var(--text-muted);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10.5px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .pin-btn:hover {
+            color: var(--text-main);
+            border-color: var(--accent);
+        }
+
+        .term-est {
+            font-size: 12px;
+            color: #e2e8f0;
+            margin-bottom: 2px;
+        }
+
+        .term-rus {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .term-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .slice-badge {
+            background: rgba(56, 189, 248, 0.14);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #7dd3fc;
+            font-size: 11px;
+            font-family: monospace;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .slice-badge:hover {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .slice-badge .del-link {
+            font-weight: bold;
+            opacity: 0.7;
+            padding-left: 2px;
+        }
+
+        .slice-badge .del-link:hover {
+            opacity: 1;
+        }
+
+        .bottom-bar {
+            background-color: var(--panel-bg);
+            border-top: 1px solid var(--panel-border);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 20;
+        }
+
+        .slice-counter {
+            font-family: monospace;
+            font-size: 13.5px;
+            font-weight: 600;
+            min-width: 125px;
+            color: var(--accent);
+        }
+
+        #sliceSlider {
+            flex: 1;
+            accent-color: var(--accent);
+            height: 6px;
+            cursor: pointer;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <div class="title">🧠 CT Viewer</div>
+
+            <div class="plane-tabs">
+                <button class="plane-tab active" data-plane="axial">
+                    Axial <span class="plane-count" id="count-axial">(0)</span>
+                </button>
+                <button class="plane-tab" data-plane="coronal">
+                    Coronal <span class="plane-count" id="count-coronal">(0)</span>
+                </button>
+                <button class="plane-tab" data-plane="sagittal">
+                    Sagittal <span class="plane-count" id="count-sagittal">(0)</span>
+                </button>
+            </div>
+
+            <label class="btn btn-primary" for="folderInput" title="Load folder into active tab (or auto-distribute if named axial/coronal/sagittal)">
+                📁 Open Folder
+            </label>
+            <input type="file" id="folderInput" webkitdirectory directory multiple>
+
+            <label class="btn" for="filesInput" title="Load image files into the active projection tab">
+                🖼️ Select Files
+            </label>
+            <input type="file" id="filesInput" accept="image/*" multiple>
+        </div>
+
+        <div class="toolbar-group">
+            <div class="control-item" title="Zoom (Ctrl + Mouse Wheel)">
+                <span>🔍 <b id="zoomLabel">100%</b></span>
+                <button class="btn" id="zoomOutBtn" style="padding: 1px 7px;">−</button>
+                <button class="btn" id="zoomInBtn" style="padding: 1px 7px;">+</button>
+            </div>
+
+            <div class="control-item">
+                <span>☀️</span>
+                <input type="range" id="brightnessRange" min="30" max="250" value="100" title="Brightness">
+            </div>
+
+            <div class="control-item">
+                <span>◐</span>
+                <input type="range" id="contrastRange" min="30" max="250" value="100" title="Contrast">
+            </div>
+
+            <button class="btn" id="invertBtn" title="Invert colors (Negative)">Invert</button>
+            <button class="btn" id="resetBtn" title="Reset view (R key)">Reset</button>
+            <button class="btn active" id="toggleGlossaryBtn" title="Toggle Anatomical Glossary & Search (Ctrl+F)">📖 Glossary (349)</button>
+        </div>
+    </div>
+
+    <div class="workspace">
+        <div class="viewport" id="viewport">
+            <div class="hud hud-top-left">
+                <div>Plane: <b id="hudPlaneName">AXIAL</b></div>
+                <div>Slice: <span id="hudSliceNum">0 / 0</span></div>
+                <div id="hudFileName" style="color: #e2e8f0; font-size: 11.5px;">No file loaded</div>
+            </div>
+
+            <div class="hud hud-top-right">
+                <div>Wheel: Scroll slices | Ctrl+Wheel: Zoom</div>
+                <div>Left Drag: Pan | 1, 2, 3: Switch Plane</div>
+            </div>
+
+            <div class="hud hud-bottom-left" id="hudBottomLeft">
+                Use "🔍 Auto-Scan Text (OCR)" or "+ Pin" in the glossary to link terms to slices
+            </div>
+
+            <img id="sliceImage" alt="CT Slice">
+
+            <div class="drop-overlay" id="dropOverlay">
+                <div class="drop-icon">🩻</div>
+                <div class="drop-title" id="dropTitle">Load Screenshots into AXIAL Plane</div>
+                <div class="drop-subtitle">
+                    Drag & drop your CT screenshots here. Because screenshots are pixel images, standard browser Ctrl+F cannot read pixels directly—use the built-in <b>🔍 Auto-Scan Text (OCR)</b> button in the sidebar (or manual <b>📌 + Pin</b>) to link your screenshots to the 349 anatomical terms!
+                </div>
+                <div class="drop-actions">
+                    <label class="btn btn-primary" for="folderInput" style="font-size: 13.5px; padding: 9px 16px;">
+                        📁 Open Screenshot Folder
+                    </label>
+                    <label class="btn" for="filesInput" style="font-size: 13.5px; padding: 9px 16px;">
+                        🖼️ Select Image Files
+                    </label>
+                </div>
+                <div class="shortcuts-box">
+                    <div><b>Controls & Shortcuts:</b></div>
+                    <div>• <b>Mouse Wheel</b> or <b>↑ / ↓ / ← / →</b> — Smoothly scroll through slices</div>
+                    <div>• <b>Ctrl + Mouse Wheel</b> — Zoom to cursor | <b>Left Mouse Drag</b> — Pan image</div>
+                    <div>• <b>Keys 1 / 2 / 3</b> — Switch between Axial, Coronal, and Sagittal tabs</div>
+                    <div>• <b>Ctrl + F</b> — Search the 349 Latin, Estonian, or Russian anatomical terms</div>
+                </div>
+            </div>
+        </div>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search Latin, Eesti, Русский or slice #... (Ctrl+F)">
+                    <button class="clear-search" id="clearSearchBtn" title="Clear search">✕</button>
+                </div>
+                <div class="sidebar-meta">
+                    <span id="termCountLabel">349 terms</span>
+                    <div class="filter-pills">
+                        <button class="pill-btn active" id="filterAllBtn">All</button>
+                        <button class="pill-btn" id="filterPinnedBtn" title="Show only terms linked to slices">Pinned</button>
+                        <button class="pill-btn" id="ocrScanBtn" title="Automatically recognize text on loaded screenshots and link matching terms">🔍 Auto-Scan (OCR)</button>
+                        <button class="pill-btn" id="exportLinksBtn" title="Export slice links to JSON">Export</button>
+                        <button class="pill-btn" id="importLinksBtn" title="Import slice links from JSON">Import</button>
+                        <input type="file" id="importLinksInput" accept=".json">
+                    </div>
+                </div>
+                <div class="ocr-status" id="ocrStatus"></div>
+            </div>
+            <div class="glossary-list" id="glossaryList"></div>
+        </aside>
+    </div>
+
+    <div class="bottom-bar">
+        <button class="btn" id="prevBtn" title="Previous slice (←)">◀</button>
+        <button class="btn" id="playBtn" title="Cine loop autoplay (Spacebar)">▶ Play</button>
+        <button class="btn" id="nextBtn" title="Next slice (→)">▶</button>
+        <div class="slice-counter" id="sliceCounter">Slice: 0 / 0</div>
+        <input type="range" id="sliceSlider" min="0" max="0" value="0" disabled>
+    </div>
+
+    <script>
+        const GLOSSARY_DATA = [["Adhaesio interthalamica", "Talamustevaheline liide", "Межталамическое сращение"], ["Ala major", "Suur tiib (kiilluu suur tiib)", "Большое крыло (клиновидной кости)"], ["Ala minor", "Väike tiib (kiilluu väike tiib)", "Малое крыло (клиновидной кости)"], ["Ala nasi", "Ninatiib", "Крыло носа"], ["Angulus pontocerebellaris", "Silla-väikeaju nurk", "Мостомозжечковый угол"], ["Anulus tympanicus", "Trummivõru", "Барабанное кольцо"], ["Apertura ductus nasolacrimalis", "Nina-pisarajuha avaus", "Апертура носослёзного протока"], ["Apertura externa canalis carotidis", "Unearterikanali välimine avaus", "Наружная апертура сонного канала"], ["Apertura interna canalis carotidis", "Unearterikanali sisemine avaus", "Внутренняя апертура сонного канала"], ["Apertura lateralis ventriculi quarti", "Neljanda vatsakese külgmine avaus (Luschka ava)", "Латеральная апертура четвёртого желудочка"], ["Apertura mediana ventriculi quarti", "Neljanda vatsakese keskmine avaus (Magendie ava)", "Срединная апертура четвёртого желудочка"], ["Apertura sinus frontalis", "Otsmikusiinuse avaus", "Апертура лобной пазухи"], ["Apertura sinus ossis sphenoidei", "Kiilluusiinuse avaus", "Апертура клиновидной пазухи"], ["Apex partis petrosae", "Kaljuosa tipp", "Верхушка каменистой части"], ["Aquaeductus mesencephali", "Keskaju veejuha", "Водопровод среднего мозга"], ["Arcus anterior atlantis", "Kandelüli eesmine kaar", "Передняя дуга атланта"], ["Arcus posterior atlantis", "Kandelüli tagumine kaar", "Задняя дуга атланта"], ["Arcus superciliaris", "Kulmukaar", "Надбровная дуга"], ["Arcus zygomaticus", "Sarnakaar", "Скуловая дуга"], ["Arteria basilaris", "Basilaararter (põhimikuarter)", "Базилярная артерия"], ["Arteria cerebri anterior: Pars postcommunicalis; Segmentum A2 [A2]", "Eesmine ajuarter: ühendusejärgne osa (A2-segment)", "Передняя мозговая артерия: посткоммуникационная часть (сегмент А2)"], ["Arteria cerebri anterior: Pars precommunicalis; Segmentum A1 [A1]", "Eesmine ajuarter: ühenduseelne osa (A1-segment)", "Передняя мозговая артерия: предкоммуникационная часть (сегмент А1)"], ["Arteria cerebri media: Pars insularis; Segmentum M2 [M2]", "Keskmine ajuarter: saareosa (M2-segment)", "Средняя мозговая артерия: островковая часть (сегмент M2)"], ["Arteria cerebri media: Pars sphenoidalis; Pars horizontalis; Segmentum M1 [M1]", "Keskmine ajuarter: kiilluuosa / horisontaalosa (M1-segment)", "Средняя мозговая артерия: клиновидная / горизонтальная часть (сегмент М1)"], ["Arteria cerebri posterior: Pars postcommunicalis; Segmentum P2 [P2]", "Tagumine ajuarter: ühendusejärgne osa (P2-segment)", "Задняя мозговая артерия: посткоммуникационная часть (сегмент Р2)"], ["Arteria cerebri posterior: Pars precommunicalis; Segmentum P1 [P1]", "Tagumine ajuarter: ühenduseelne osa (P1-segment)", "Задняя мозговая артерия: предкоммуникационная часть (сегмент Р1)"], ["Arteria communicans anterior", "Eesmine ühendusarter", "Передняя соединительная артерия"], ["Arteria communicans posterior", "Tagumine ühendusarter", "Задняя соединительная артерия"], ["Arteria inferior posterior cerebelli", "Väikeaju alumine tagumine arter", "Задняя нижняя мозжечковая артерия"], ["Arteria superior cerebelli", "Väikeaju ülemine arter", "Верхняя мозжечковая артерия"], ["Arteria vertebralis: Segmentum extraduralis; Segmentum atlanticum (V3) [V3]", "Selgrooarter: kõvakestaväline / kandelüliosa (V3-segment)", "Позвоночная артерия: экстрадуральный / атлантовый сегмент (V3)"], ["Arteria vertebralis: Segmentum foraminalis (V2) [V2]", "Selgrooarter: ristijätkemulkude osa (V2-segment)", "Позвоночная артерия: фораминальный сегмент (V2)"], ["Arteria vertebralis: Segmentum intraduralis; Segmentum intracranialis (V4) [V4]", "Selgrooarter: kõvakestasisene / koljusisene osa (V4-segment)", "Позвоночная артерия: интрадуральный / внутричерепной сегмент (V4)"], ["Articulatio atlantoaxialis mediana", "Keskmine kande-telglüliliiges", "Срединный атлантоосевой сустав"], ["Articulatio atlantooccipitalis", "Kandelüli-kuklaluuliiges", "Атлантозатылочный сустав"], ["Articulatio temporomandibularis", "Alalõualiiges", "Височно-нижнечелюстной сустав"], ["Atlas", "Kandelüli (atlas)", "Атлант (первый шейный позвонок)"], ["Atrium meatus medii", "Keskmise ninakäigu esik (aatrium)", "Преддверие среднего носового хода"], ["Atrium ventriculi lateralis", "Külgvatsakese kolmnurk (aatrium)", "Преддверие (треугольник) бокового желудочка"], ["Auris", "Kõrv", "Ухо"], ["Axis", "Telglüli (aksis)", "Осевой позвонок (аксис)"], ["Basis cranii", "Koljupõhimik", "Основание черепа"], ["Bucca", "Põsk", "Щека"], ["Bulla ethmoidea", "Sõelluupõis", "Решётчатый пузырёк"], ["Bulla ethmoidea ossea", "Luuline sõelluupõis", "Костный решётчатый пузырёк"], ["Calcar avis", "Kukekannus", "Птичья шпора"], ["Calvaria", "Koljuvõlv", "Свод черепа"], ["Canales diploici", "Diploekanalid", "Диплоические каналы"], ["Canales incisivi", "Lõikehambakanalid", "Резцовые каналы"], ["Canalis carotidis", "Unearterikanal", "Сонный канал"], ["Canalis condylaris", "Põndakanal", "Мыщелковый канал"], ["Canalis facialis", "Näonärvikanal", "Лицевой канал"], ["Canalis hypoglossus", "Keelealuse närvi kanal", "Подъязычный канал"], ["Canalis infraorbitalis", "Silmakoopaalune kanal", "Подглазничный канал"], ["Canalis mandibulae", "Alalõuakanal", "Канал нижней челюсти"], ["Canalis musculotubarius", "Lihase-kuulmetõri kanal", "Мышечно-трубный канал"], ["Canalis nasolacrimalis", "Nina-pisarakanal", "Носослёзный канал"], ["Canalis opticus", "Nägemisnärvikanal", "Зрительный канал"], ["Canalis palatinus major", "Suur suulaekanal", "Большой нёбный канал"], ["Canalis pterygoideus", "Tiibjätkekanal", "Крыловидный канал"], ["Capsula interna", "Sisemine kihn", "Внутренняя капсула"], ["Caput", "Pea", "Голова"], ["Caput nuclei caudati", "Sabatuuma pea", "Головка хвостатого ядра"], ["Cauda nuclei caudati", "Sabatuuma saba", "Хвост хвостатого ядра"], ["Cavitas cranii", "Koljuõõs", "Полость черепа"], ["Cavitas orbitae", "Silmakoobas", "Глазница (полость глазницы)"], ["Cavitas oris", "Suuõõs", "Полость рта"], ["Cavitas tympani cranii", "Trummiõõs", "Барабанная полость"], ["Cavum trigeminale", "Kolmiknärviõõs", "Тройничная полость"], ["Cellulae ethmoideae anteriores", "Eesmised sõelluurakud", "Передние решётчатые ячейки"], ["Cellulae ethmoideae mediae", "Keskmised sõelluurakud", "Средние решётчатые ячейки"], ["Cellulae ethmoideae posteriores", "Tagumised sõelluurakud", "Задние решётчатые ячейки"], ["Cerebellum", "Väikeaju", "Мозжечок"], ["Chiasma opticum", "Nägemisristmik", "Зрительный перекрёст"], ["Choana", "Tagasõõre (koaan)", "Хоана"], ["Choana cranii", "Kolju tagasõõre (koaan)", "Хоана черепа"], ["Circulus arteriosus cerebri", "Suuraju arteriaalring (Willise ring)", "Артериальный круг большого мозга"], ["Clivus", "Nõlv (kliivus)", "Скат"], ["Collum", "Kael", "Шея"], ["Collum mandibulae", "Alalõuakael", "Шейка нижней челюсти"], ["Commissura anterior", "Eesmine komissuur", "Передняя спайка"], ["Commissura posterior", "Tagumine komissuur", "Задняя спайка"], ["Concha inferior nasi", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha media nasi", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis inferior", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha nasalis media", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis superior", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Concha superior nasi", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Condylus mandibulae", "Alalõuapõnt (alalõuapea)", "Мыщелок (головка) нижней челюсти"], ["Condylus occipitalis", "Kuklapõnt", "Затылочный мыщелок"], ["Confluens sinuum", "Siinuste ühinemiskoht", "Сток синусов"], ["Cornu frontale", "Otsmikusarv (eesmine sarv)", "Лобный (передний) рог"], ["Cornu occipitale", "Kuklasarv (tagumine sarv)", "Затылочный (задний) рог"], ["Cornu temporale", "Oimusarv (alumine sarv)", "Височный (нижний) рог"], ["Corona radiata", "Kiirtepärg", "Лучистый венец"], ["Corpus adiposum buccae", "Põse rasvkeha", "Жировое тело щеки"], ["Corpus nuclei caudati", "Sabatuuma keha", "Тело хвостатого ядра"], ["Corpus ossis sphenoidei", "Kiilluu keha", "Тело клиновидной кости"], ["Cranium", "Kolju", "Череп"], ["Crista frontalis", "Otsmikuhari", "Лобный гребень"], ["Crista galli", "Kukehari", "Петушиный гребень"], ["Crista lacrimalis posterior", "Tagumine pisarahari", "Задний слёзный гребень"], ["Crista nasalis maxillae", "Ülalõualuu ninahari", "Носовой гребень верхней челюсти"], ["Crista nasalis ossis palatini", "Suulaeluu ninahari", "Носовой гребень нёбной кости"], ["Crista occipitalis externa", "Välimine kuklahari", "Наружный затылочный гребень"], ["Crista occipitalis interna", "Sisemine kuklahari", "Внутренний затылочный гребень"], ["Crista sphenoidea", "Kiilluuhari", "Клиновидный гребень"], ["Dens axis", "Telglüli hammas", "Зуб осевого позвонка"], ["Dentes", "Hambad", "Зубы"], ["Diaphragma sellae", "Sadulavahelihas (saduladiafragma)", "Диафрагма седла"], ["Diencephalon", "Vaheaju", "Промежуточный мозг"], ["Diploe", "Diploe", "Диплоэ"], ["Dorsum nasi", "Ninaselg", "Спинка носа"], ["Dorsum sellae", "Sadulaselg", "Спинка седла"], ["Encephalon", "Peaaju", "Головной мозг"], ["Facies", "Nägu", "Лицо"], ["Facies anterior maxillae", "Ülalõualuu eesmine pind", "Передняя поверхность верхней челюсти"], ["Facies articularis superior atlantis", "Kandelüli ülemine liigesepind", "Верхняя суставная поверхность атланта"], ["Facies infratemporalis maxillae", "Ülalõualuu oimualune pind", "Подвисочная поверхность верхней челюсти"], ["Facies nasalis maxillae", "Ülalõualuu ninapind", "Носовая поверхность верхней челюсти"], ["Facies orbitalis maxillae", "Ülalõualuu silmakoopapind", "Глазничная поверхность верхней челюсти"], ["Falx cerebelli", "Väikeajusirp", "Серп мозжечка"], ["Falx cerebri", "Suurajusirp", "Серп большого мозга"], ["Fissura chorioidea", "Soonpõimikulõhe", "Сосудистая щель"], ["Fissura orbitalis inferior", "Alumine silmakoopalõhe", "Нижняя глазничная щель"], ["Fissura orbitalis superior", "Ülemine silmakoopalõhe", "Верхняя глазничная щель"], ["Flocculus [H X]", "Flokulus (väikeajututt) [H X]", "Клочок мозжечка [Н Х]"], ["Foramen alveolare inferius", "Alalõuamulk", "Нижнее альвеолярное отверстие (отверстие нижней челюсти)"], ["Foramen caecum ossis frontalis", "Otsmikuluu umbmulk", "Слепое отверстие лобной кости"], ["Foramen infraorbitale", "Silmakoopaalune mulk", "Подглазничное отверстие"], ["Foramen interventriculare", "Vatsakestevaheline mulk", "Межжелудочковое отверстие"], ["Foramen jugulare", "Kägimulk", "Яремное отверстие"], ["Foramen lacerum", "Rebimulk", "Рваное отверстие"], ["Foramen magnum", "Suur kuklamulk", "Большое (затылочное) отверстие"], ["Foramen mastoideum", "Nibujätkemulk", "Сосцевидное отверстие"], ["Foramen ovale", "Ovaalmulk", "Овальное отверстие"], ["Foramen palatinum majus", "Suur suulaemulk", "Большое нёбное отверстие"], ["Foramen parietale", "Kiiruluumulk", "Теменное отверстие"], ["Foramen rotundum", "Ümarmulk", "Круглое отверстие"], ["Foramen sphenopalatinum", "Kiilluu-suulaemulk", "Клиновидно-нёбное отверстие"], ["Foramen spinosum", "Ogamulk", "Остистое отверстие"], ["Foramen stylomastoideum", "Tikkel-nibujätkemulk", "Шилососцевидное отверстие"], ["Foramen transversarium", "Ristijätkemulk", "Поперечное отверстие"], ["Fornix", "Ajukaar (võlv)", "Свод"], ["Fossa anterior cranii", "Eesmine koljuauk", "Передняя черепная ямка"], ["Fossa condylaris", "Põndaauk", "Мыщелковая ямка"], ["Fossa incisiva", "Lõikehambaauk", "Резцовая ямка"], ["Fossa jugularis", "Kägiauk", "Яремная ямка"], ["Fossa mandibularis", "Alalõuaauk", "Нижнечелюстная ямка"], ["Fossa media cranii", "Keskmine koljuauk", "Средняя черепная ямка"], ["Fossa posterior cranii", "Tagumine koljuauk", "Задняя черепная ямка"], ["Fossa pterygoidea", "Tiibjätkeauk", "Крыловидная ямка"], ["Fossa scaphoidea", "Lootsikauk (paatjas auk)", "Ладьевидная ямка"], ["Fossula petrosa", "Kaljulohuke", "Каменистая ямочка"], ["Fovea pterygoidea", "Tiibjätkelohk", "Крыловидная ямка (нижней челюсти)"], ["Foveolae granulares", "Granulatsioonilohukesed", "Ямочки грануляций"], ["Frons cranii", "Otsmik (laup)", "Лоб"], ["Genu corporis callosi", "Mõhnkeha põlv", "Колено мозолистого тела"], ["Gingiva", "Ige", "Десна"], ["Glabella", "Kulmudevahe (glabella)", "Глабелла (надпереносье)"], ["Glandula parotidea", "Kõrvasüljenääre", "Околоушная слюнная железа"], ["Glandula pinealis", "Käbikeha (epifüüs)", "Шишковидное тело (эпифиз)"], ["Granulationes arachnoideae", "Ämblikuvõrkkesta granulatsioonid", "Грануляции паутинной оболочки"], ["Hamulus pterygoideus", "Tiibjätkekonks", "Крыловидный крючок"], ["Hemisphaerium cerebelli", "Väikeaju poolkera", "Полушарие мозжечка"], ["Hemisphaerium cerebri", "Suuraju poolkera", "Полушарие большого мозга"], ["Hiatus maxillae", "Ülalõuaurkehaigutus", "Расщелина верхнечелюстной пазухи"], ["Hypophysis", "Ajuripats (hüpofüüs)", "Гипофиз"], ["Hypothalamus", "Hüpotalamus", "Гипоталамус"], ["Incisura jugularis ossis occipitalis", "Kuklaluu kägisälk", "Яремная вырезка затылочной кости"], ["Incisura jugularis ossis temporalis", "Oimuluu kägisälk", "Яремная вырезка височной кости"], ["Incisura mandibulae", "Alalõuasälk", "Вырезка нижней челюсти"], ["Incisura mastoidea", "Nibujätkesälk", "Сосцевидная вырезка"], ["Incisura pterygoidea", "Tiibjätkesälk", "Крыловидная вырезка"], ["Incisura supraorbitalis", "Silmakoopaülene sälk", "Надглазничная вырезка"], ["Incisura tentorii", "Väikeajutelgi sälk", "Вырезка намёта мозжечка"], ["Infundibulum ethmoideum", "Sõelluulehter", "Решётчатая воронка"], ["Infundibulum ethmoideum osseum", "Luuline sõelluulehter", "Костная решётчатая воронка"], ["Insula", "Saar (Reili saar)", "Островок (островковая доля)"], ["Jugum sphenoideum", "Kiilluuike", "Клиновидное возвышение"], ["Labium superius oris", "Ülahuul", "Верхняя губа"], ["Labyrinthus ethmoideus", "Sõelluulabürint", "Решётчатый лабиринт"], ["Lamina cribrosa", "Sõellest", "Решётчатая пластинка"], ["Lamina horizontalis ossis palatini", "Suulaeluu rõhtlest", "Горизонтальная пластинка нёбной кости"], ["Lamina lateralis processus pterygoidei", "Tiibjätke külgmine lest", "Латеральная пластинка крыловидного отростка"], ["Lamina medialis processus pterygoidei", "Tiibjätke keskmine lest", "Медиальная пластинка крыловидного отростка"], ["Lamina orbitalis labyrinthi ethmoidei", "Sõelluulabürindi silmakoopalest", "Глазничная пластинка решётчатого лабиринта"], ["Lamina perpendicularis ossis ethmoidei", "Sõelluu püstlest", "Перпендикулярная пластинка решётчатой кости"], ["Lamina perpendicularis ossis palatini", "Suulaeluu püstlest", "Перпендикулярная пластинка нёбной кости"], ["Lingua", "Keel", "Язык"], ["Lobus anterior cerebelli", "Väikeaju eesmine sagar", "Передняя доля мозжечка"], ["Lobus frontalis", "Otsmikusagar", "Лобная доля"], ["Lobus occipitalis", "Kuklasagar", "Затылочная доля"], ["Lobus parietalis", "Kiirusagar", "Теменная доля"], ["Lobus posterior cerebelli", "Väikeaju tagumine sagar", "Задняя доля мозжечка"], ["Lobus temporalis", "Oimusagar", "Височная доля"], ["Margo infraorbitalis", "Silmakoopa alumine serv", "Подглазничный край"], ["Margo lateralis orbitae", "Silmakoopa külgmine serv", "Латеральный край глазницы"], ["Margo medialis orbitae", "Silmakoopa keskmine serv", "Медиальный край глазницы"], ["Margo supraorbitalis", "Silmakoopa ülemine serv", "Надглазничный край"], ["Massa lateralis atlantis", "Kandelüli külgmass", "Латеральная масса атланта"], ["Maxilla", "Ülalõualuu", "Верхняя челюсть"], ["Meatus acusticus externus cranii", "Välimine kuulmekäik", "Наружный слуховой проход"], ["Meatus acusticus internus", "Sisemine kuulmekäik", "Внутренний слуховой проход"], ["Meatus communis nasi", "Ühine ninakäik", "Общий носовой ход"], ["Meatus inferior nasi", "Alumine ninakäik", "Нижний носовой ход"], ["Meatus medius nasi", "Keskmine ninakäik", "Средний носовой ход"], ["Meatus nasalis communis cranii", "Ühine ninakäik (koljus)", "Общий носовой ход (черепа)"], ["Meatus nasalis inferior cranii", "Alumine ninakäik (koljus)", "Нижний носовой ход (черепа)"], ["Meatus nasalis medius cranii", "Keskmine ninakäik (koljus)", "Средний носовой ход (черепа)"], ["Meatus nasalis superior cranii", "Ülemine ninakäik (koljus)", "Верхний носовой ход (черепа)"], ["Meatus nasopharyngeus", "Ninaneelukäik", "Носоглоточный ход"], ["Meatus nasopharyngeus cranii", "Kolju ninaneelukäik", "Носоглоточный ход (черепа)"], ["Meatus superior nasi", "Ülemine ninakäik", "Верхний носовой ход"], ["Medulla oblongata", "Piklikaju", "Продолговатый мозг"], ["Medulla spinalis", "Seljaaju", "Спинной мозг"], ["Mesencephalon", "Keskaju", "Средний мозг"], ["Naris", "Sõõre (ninasõõre)", "Ноздря"], ["Nasus externus", "Välisnina", "Наружный нос"], ["Nuclei basales et structurae pertinentes", "Basaaltuumad ja seonduvad struktuurid", "Базальные ядра и относящиеся к ним структуры"], ["Nucleus lentiformis", "Läätstuum", "Чечевицеобразное ядро"], ["Occiput", "Kukal", "Затылок"], ["Occiput cranii", "Kolju kukal", "Затылок (черепа)"], ["Os ethmoideum", "Sõelluu", "Решётчатая кость"], ["Os frontale", "Otsmikuluu", "Лобная кость"], ["Os lacrimale", "Pisaraluu", "Слёзная кость"], ["Os occipitale", "Kuklaluu", "Затылочная кость"], ["Os parietale", "Kiiruluu", "Теменная кость"], ["Os sphenoideum", "Kiilluu", "Клиновидная кость"], ["Os zygomaticum", "Sarnaluu", "Скуловая кость"], ["Ostium pharyngeum tubae auditivae", "Kuulmetõri neelusuue", "Глоточное отверстие слуховой трубы"], ["Palatum durum", "Kõva suulagi", "Твёрдое нёбо"], ["Palatum molle", "Pehme suulagi", "Мягкое нёбо"], ["Palatum osseum", "Luuline suulagi", "Костное нёбо"], ["Palpebra inferior", "Alalaug", "Нижнее веко"], ["Palpebra superior", "Ülalaug", "Верхнее веко"], ["Paries inferior orbitae", "Silmakoopa alumine sein", "Нижняя стенка глазницы"], ["Paries lateralis orbitae", "Silmakoopa külgmine sein", "Латеральная стенка глазницы"], ["Paries medialis orbitae", "Silmakoopa keskmine sein", "Медиальная стенка глазницы"], ["Paries superior orbitae", "Silmakoopa ülemine sein", "Верхняя стенка глазницы"], ["Pars basilaris ossis occipitalis", "Kuklaluu põhimikuosa", "Базилярная часть затылочной кости"], ["Pars cavernosa arteriae carotidis internae", "Sisemise unearteri korgasosa", "Пещеристая часть внутренней сонной артерии"], ["Pars centralis ventriculi lateralis", "Külgvatsakese keskosa", "Центральная часть бокового желудочка"], ["Pars cerebralis arteriae carotidis internae", "Sisemise unearteri ajuosa", "Мозговая часть внутренней сонной артерии"], ["Pars cervicalis arteriae carotidis internae", "Sisemise unearteri kaelaosa", "Шейная часть внутренней сонной артерии"], ["Pars nasalis ossis frontalis", "Otsmikuluu ninaosa", "Носовая часть лобной кости"], ["Pars orbitalis ossis frontalis", "Otsmikuluu silmakoopaosa", "Глазничная часть лобной кости"], ["Pars ossea septi nasi", "Ninavaheseina luuline osa", "Костная часть перегородки носа"], ["Pars petrosa arteriae carotidis internae", "Sisemise unearteri kaljuosa", "Каменистая часть внутренней сонной артерии"], ["Pars petrosa ossis temporalis", "Oimuluu kaljuosa (püramiid)", "Каменистая часть височной кости (пирамида)"], ["Pars squamosa ossis temporalis", "Oimuluu soomusosa", "Чешуйчатая часть височной кости"], ["Pars tympanica ossis temporalis", "Oimuluu trummiosa", "Барабанная часть височной кости"], ["Pedunculi cerebellares", "Väikeajuvarred", "Мозжечковые ножки"], ["Pedunculus cerebri", "Suurajujalg", "Ножка мозга"], ["Pharynx", "Neel", "Глотка"], ["Plexus chorioideus ventriculi lateralis", "Külgvatsakese soonpõimik", "Сосудистое сплетение бокового желудочка"], ["Plexus chorioideus ventriculi tertii", "Kolmanda vatsakese soonpõimik", "Сосудистое сплетение третьего желудочка"], ["Pons", "Ajusild (pons)", "Мост (варолиев мост)"], ["Porus acusticus externus cranii", "Välimine kuulmeava", "Наружное слуховое отверстие"], ["Porus acusticus internus", "Sisemine kuulmeava", "Внутреннее слуховое отверстие"], ["Processus alveolaris maxillae", "Ülalõualuu sombujätke (alveolaarjätke)", "Альвеолярный отросток верхней челюсти"], ["Processus clinoideus anterior", "Eesmine kaldjätke", "Передний наклонённый отросток"], ["Processus clinoideus posterior", "Tagumine kaldjätke", "Задний наклонённый отросток"], ["Processus coronoideus mandibulae", "Alalõualuu pärgjätke", "Венечный отросток нижней челюсти"], ["Processus frontalis maxillae", "Ülalõualuu otsmikujätke", "Лобный отросток верхней челюсти"], ["Processus frontalis ossis zygomatici", "Sarnaluu otsmikujätke", "Лобный отросток скуловой кости"], ["Processus mastoideus", "Nibujätke", "Сосцевидный отросток"], ["Processus palatinus", "Suulaejätke", "Нёбный отросток"], ["Processus styloideus ossis temporalis", "Oimuluu tikkeljätke", "Шиловидный отросток височной кости"], ["Processus temporalis ossis zygomatici", "Sarnaluu oimujätke", "Височный отросток скуловой кости"], ["Processus transversus", "Ristijätke", "Поперечный отросток"], ["Processus zygomaticus maxillae", "Ülalõualuu sarnajätke", "Скуловой отросток верхней челюсти"], ["Processus zygomaticus ossis frontalis", "Otsmikuluu sarnajätke", "Скуловой отросток лобной кости"], ["Processus zygomaticus ossis temporalis", "Oimuluu sarnajätke", "Скуловой отросток височной кости"], ["Protuberantia occipitalis externa", "Välimine kuklamügar", "Наружный затылочный выступ"], ["Protuberantia occipitalis interna", "Sisemine kuklamügar", "Внутренний затылочный выступ"], ["Radiatio corporis callosi", "Mõhnkeha kiirgus", "Лучистость мозолистого тела"], ["Radix nasi", "Ninajuur", "Корень носа"], ["Ramus mandibulae", "Alalõuaharu", "Ветвь нижней челюсти"], ["Recessus pharyngeus", "Neelusopp", "Глоточный карман"], ["Recessus sphenoethmoideus", "Kiil-sõelluusopp", "Клиновидно-решётчатое углубление"], ["Recessus sphenoethmoideus cranii", "Kolju kiil-sõelluusopp", "Клиновидно-решётчатое углубление (черепа)"], ["Rima palpebrarum", "Silmalau pilu", "Щель век (глазная щель)"], ["Rostrum corporis callosi", "Mõhnkeha nokk", "Клюв мозолистого тела"], ["Rostrum sphenoideum", "Kiilluunokk", "Клиновидный клюв"], ["Sella turcica", "Türgi sadul", "Турецкое седло"], ["Septum nasi", "Ninavahesein", "Перегородка носа"], ["Septum pellucidum", "Läbipaistev vahesein", "Прозрачная перегородка"], ["Septum sinuum frontalium", "Otsmikusiinuste vahesein", "Перегородка лобных пазух"], ["Septum sinuum sphenoideorum", "Kiilluusiinuste vahesein", "Перегородка клиновидных пазух"], ["Sinciput", "Eespea (laup)", "Передняя часть головы (чело)"], ["Sinus cavernosus", "Korgassiinus", "Пещеристый синус"], ["Sinus frontalis", "Otsmikusiinus (otsmikuurk)", "Лобная пазуха"], ["Sinus maxillae", "Ülalõuasiinus (ülalõuaurk)", "Пазуха верхней челюсти"], ["Sinus maxillaris", "Ülalõuasiinus (ülalõuaurk)", "Верхнечелюстная пазуха (гайморова пазуха)"], ["Sinus occipitalis", "Kuklasiinus", "Затылочный синус"], ["Sinus ossis frontalis", "Otsmikuluu siinus (otsmikuurk)", "Пазуха лобной кости"], ["Sinus ossis sphenoidei", "Kiilluusiinus (kiilluu-urk)", "Пазуха клиновидной кости"], ["Sinus rectus", "Sirgsiinus", "Прямой синус"], ["Sinus sagittalis inferior", "Alumine sagitaalsiinus", "Нижний сагиттальный синус"], ["Sinus sagittalis superior", "Ülemine sagitaalsiinus", "Верхний сагиттальный синус"], ["Sinus sigmoideus", "Sigmasiinus", "Сигмовидный синус"], ["Sinus sphenoideus", "Kiilluusiinus (kiilluu-urk)", "Клиновидная пазуха"], ["Sinus transversus", "Ristsiinus", "Поперечный синус"], ["Spina nasalis anterior", "Eesmine ninaoga", "Передняя носовая ость"], ["Spina nasalis ossis frontalis", "Otsmikuluu ninaoga", "Носовая ость лобной кости"], ["Spina nasalis posterior", "Tagumine ninaoga", "Задняя носовая ость"], ["Spina ossis sphenoidei", "Kiilluuoga", "Ость клиновидной кости"], ["Splenium corporis callosi", "Mõhnkeha paksend", "Валик мозолистого тела"], ["Squama frontalis", "Otsmikuluu soomus", "Лобная чешуя"], ["Squama occipitalis", "Kuklaluu soomus", "Затылочная чешуя"], ["Stoma", "Suu (suuava)", "Рот (ротовое отверстие)"], ["Sulci venosi", "Veenivaod", "Венозные борозды"], ["Sulcus arteriae vertebralis", "Selgrooarteri vagu", "Борозда позвоночной артерии"], ["Sulcus carotidis", "Unearterivagu", "Сонная борозда"], ["Sulcus lacrimalis", "Pisaravagu", "Слёзная борозда"], ["Sulcus palatinus major maxillae", "Ülalõualuu suur suulaevagu", "Большая нёбная борозда верхней челюсти"], ["Sulcus sinus sagittalis superioris", "Ülemise sagitaalsiinuse vagu", "Борозда верхнего сагиттального синуса"], ["Sulcus tubae auditivae", "Kuulmetõri vagu", "Борозда слуховой трубы"], ["Tegmen tympani", "Trummiõõne katus (trummikatus)", "Крыша барабанной полости"], ["Tela chorioidea ventriculi quarti", "Neljanda vatsakese soonkile", "Сосудистая основа четвёртого желудочка"], ["Tempus", "Oim (meelekoht)", "Висок"], ["Tentorium cerebelli", "Väikeajutelk", "Намёт мозжечка"], ["Thalamus", "Talamus", "Таламус (зрительный бугор)"], ["Tonsilla cerebelli [H IX]", "Väikeajumandel [H IX]", "Миндалина мозжечка [Н IX]"], ["Torus tubarius", "Kuulmetõri paksend", "Трубный валик"], ["Tractus opticus", "Nägemistrakt", "Зрительный тракт"], ["Truncus corporis callosi", "Mõhnkeha tüvi", "Ствол мозолистого тела"], ["Truncus encephali", "Ajutüvi", "Ствол головного мозга"], ["Tuber maxillae", "Ülalõuamügar", "Бугор верхней челюсти"], ["Tuberculum articulare", "Liigesekühmuke", "Суставной бугорок"], ["Tuberculum jugulare", "Kägikühmuke", "Яремный бугорок"], ["Vagina processus styloidei", "Tikkeljätketupp", "Влагалище шиловидного отростка"], ["Vena anastomotica inferior", "Alumine anastomoosveen (Labbé veen)", "Нижняя анастомотическая вена (вена Лаббе)"], ["Vena anastomotica superior", "Ülemine anastomoosveen (Trolardi veen)", "Верхняя анастомотическая вена (вена Тролара)"], ["Vena basalis", "Põhimikuveen (Rosenthali veen)", "Базальная вена (вена Розенталя)"], ["Vena interna cerebri", "Sisemine ajuveen", "Внутренняя мозговая вена"], ["Vena jugularis interna", "Sisemine kägiveen", "Внутренняя яремная вена"], ["Vena magna cerebri", "Suur ajuveen (Galenose veen)", "Большая мозговая вена (вена Галена)"], ["Vena media superficialis cerebri", "Pindmine keskmine ajuveen", "Поверхностная средняя мозговая вена"], ["Vena thalamostriata superior", "Ülemine talamostriaalveen", "Верхняя таламостриарная вена"], ["Ventriculi cerebri", "Ajuvatsakesed", "Желудочки головного мозга"], ["Ventriculus lateralis", "Külgvatsake", "Боковой желудочек"], ["Ventriculus quartus", "Neljas vatsake", "Четвёртый желудочек"], ["Ventriculus tertius", "Kolmas vatsake", "Третий желудочек"], ["Vermis cerebelli", "Väikeajuuss", "Червь мозжечка"], ["Vertex", "Pealagi", "Темя (макушка)"], ["Vestibulum nasi", "Ninaesik", "Преддверие носа"], ["Vomer", "Sahkluu", "Сошник"]];
+
+        const planes = {
+            axial:    { images: [], index: 0, scale: 1, panX: 0, panY: 0 },
+            coronal:  { images: [], index: 0, scale: 1, panX: 0, panY: 0 },
+            sagittal: { images: [], index: 0, scale: 1, panX: 0, panY: 0 }
+        };
+        let activePlane = 'axial';
+
+        const STORAGE_KEY = 'ct_viewer_term_links_v2';
+        let termLinks = {};
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) termLinks = JSON.parse(saved);
+        } catch (e) {}
+
+        function saveTermLinks() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(termLinks));
+            } catch (e) {}
+        }
+
+        const folderInput = document.getElementById('folderInput');
+        const filesInput = document.getElementById('filesInput');
+        const dropOverlay = document.getElementById('dropOverlay');
+        const dropTitle = document.getElementById('dropTitle');
+        const viewport = document.getElementById('viewport');
+        const sliceImage = document.getElementById('sliceImage');
+        const sliceSlider = document.getElementById('sliceSlider');
+        const sliceCounter = document.getElementById('sliceCounter');
+        const hudPlaneName = document.getElementById('hudPlaneName');
+        const hudSliceNum = document.getElementById('hudSliceNum');
+        const hudFileName = document.getElementById('hudFileName');
+        const zoomLabel = document.getElementById('zoomLabel');
+
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const playBtn = document.getElementById('playBtn');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const brightnessRange = document.getElementById('brightnessRange');
+        const contrastRange = document.getElementById('contrastRange');
+        const invertBtn = document.getElementById('invertBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        const sidebar = document.getElementById('sidebar');
+        const toggleGlossaryBtn = document.getElementById('toggleGlossaryBtn');
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        const glossaryList = document.getElementById('glossaryList');
+        const termCountLabel = document.getElementById('termCountLabel');
+        const filterAllBtn = document.getElementById('filterAllBtn');
+        const filterPinnedBtn = document.getElementById('filterPinnedBtn');
+        const ocrScanBtn = document.getElementById('ocrScanBtn');
+        const ocrStatus = document.getElementById('ocrStatus');
+        const exportLinksBtn = document.getElementById('exportLinksBtn');
+        const importLinksBtn = document.getElementById('importLinksBtn');
+        const importLinksInput = document.getElementById('importLinksInput');
+
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let brightness = 100;
+        let contrast = 100;
+        let inverted = false;
+        let playInterval = null;
+        let showOnlyPinned = false;
+        let isScanningOCR = false;
+
+        document.querySelectorAll('.plane-tab').forEach(btn => {
+            btn.addEventListener('click', () => switchPlane(btn.dataset.plane));
+        });
+
+        function switchPlane(planeName) {
+            if (!planes[planeName]) return;
+            activePlane = planeName;
+
+            document.querySelectorAll('.plane-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.plane === activePlane);
+            });
+
+            hudPlaneName.textContent = activePlane.toUpperCase();
+            dropTitle.textContent = `Load Screenshots into ${activePlane.toUpperCase()} Plane`;
+
+            const st = planes[activePlane];
+            if (st.images.length > 0) {
+                dropOverlay.classList.add('hidden');
+                sliceImage.style.display = 'block';
+                sliceSlider.min = 0;
+                sliceSlider.max = st.images.length - 1;
+                sliceSlider.disabled = false;
+                updateTransform();
+                showSlice(st.index);
+            } else {
+                dropOverlay.classList.remove('hidden');
+                sliceImage.style.display = 'none';
+                sliceSlider.min = 0;
+                sliceSlider.max = 0;
+                sliceSlider.value = 0;
+                sliceSlider.disabled = true;
+                sliceCounter.textContent = 'Slice: 0 / 0';
+                hudSliceNum.textContent = '0 / 0';
+                hudFileName.textContent = 'No file loaded';
+            }
+        }
+
+        function updatePlaneCounts() {
+            ['axial', 'coronal', 'sagittal'].forEach(p => {
+                document.getElementById(`count-${p}`).textContent = `(${planes[p].images.length})`;
+            });
+        }
+
+        function isImageFile(file) {
+            return file.type.startsWith('image/') || /\.(png|jpe?g|bmp|webp|gif|tiff?)$/i.test(file.name);
+        }
+
+        function detectPlaneFromPath(file) {
+            const p = ((file.webkitRelativePath || '') + ' ' + file.name).toLowerCase();
+            if (/\b(axial|ax)\b/.test(p) || p.includes('axial') || p.includes('_ax_')) return 'axial';
+            if (/\b(coronal|cor)\b/.test(p) || p.includes('coronal') || p.includes('_cor_')) return 'coronal';
+            if (/\b(sagittal|sag)\b/.test(p) || p.includes('sagittal') || p.includes('_sag_')) return 'sagittal';
+            return null;
+        }
+
+        function setPlaneFiles(planeName, fileArray) {
+            const st = planes[planeName];
+            st.images.forEach(item => URL.revokeObjectURL(item.url));
+
+            fileArray.sort((a, b) =>
+                a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+            );
+
+            st.images = fileArray.map(file => ({
+                name: file.name,
+                url: URL.createObjectURL(file),
+                ocrText: ''
+            }));
+
+            st.images.forEach(item => {
+                const preload = new Image();
+                preload.src = item.url;
+            });
+
+            st.index = 0;
+        }
+
+        function loadFiles(fileList) {
+            const validFiles = Array.from(fileList).filter(isImageFile);
+            if (validFiles.length === 0) {
+                alert('No valid image files (PNG, JPG, WEBP, BMP, TIFF) found.');
+                return;
+            }
+
+            const buckets = { axial: [], coronal: [], sagittal: [], unknown: [] };
+            validFiles.forEach(f => {
+                const detected = detectPlaneFromPath(f);
+                if (detected) buckets[detected].push(f);
+                else buckets.unknown.push(f);
+            });
+
+            const hasAutoDetected = buckets.axial.length > 0 || buckets.coronal.length > 0 || buckets.sagittal.length > 0;
+
+            if (hasAutoDetected && buckets.unknown.length === 0) {
+                if (buckets.axial.length > 0) setPlaneFiles('axial', buckets.axial);
+                if (buckets.coronal.length > 0) setPlaneFiles('coronal', buckets.coronal);
+                if (buckets.sagittal.length > 0) setPlaneFiles('sagittal', buckets.sagittal);
+
+                updatePlaneCounts();
+                if (buckets[activePlane].length > 0) switchPlane(activePlane);
+                else if (buckets.axial.length > 0) switchPlane('axial');
+                else if (buckets.coronal.length > 0) switchPlane('coronal');
+                else if (buckets.sagittal.length > 0) switchPlane('sagittal');
+            } else {
+                setPlaneFiles(activePlane, validFiles);
+                updatePlaneCounts();
+                switchPlane(activePlane);
+            }
+        }
+
+        function showSlice(index) {
+            const st = planes[activePlane];
+            if (st.images.length === 0) return;
+            if (index < 0) index = 0;
+            if (index >= st.images.length) index = st.images.length - 1;
+
+            st.index = index;
+            const current = st.images[st.index];
+            sliceImage.src = current.url;
+            sliceSlider.value = st.index;
+
+            const textCount = `${st.index + 1} / ${st.images.length}`;
+            sliceCounter.textContent = `Slice: ${textCount}`;
+            hudSliceNum.textContent = textCount;
+            hudFileName.textContent = current.name;
+        }
+
+        function updateTransform() {
+            const st = planes[activePlane];
+            sliceImage.style.transform = `translate(${st.panX}px, ${st.panY}px) scale(${st.scale})`;
+            zoomLabel.textContent = `${Math.round(st.scale * 100)}%`;
+        }
+
+        function updateFilters() {
+            const inv = inverted ? 100 : 0;
+            sliceImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%) invert(${inv}%)`;
+        }
+
+        function resetView() {
+            const st = planes[activePlane];
+            st.scale = 1;
+            st.panX = 0;
+            st.panY = 0;
+            brightness = 100;
+            contrast = 100;
+            inverted = false;
+            brightnessRange.value = 100;
+            contrastRange.value = 100;
+            invertBtn.classList.remove('active');
+            updateTransform();
+            updateFilters();
+        }
+
+        function renderGlossary() {
+            const query = searchInput.value.trim().toLowerCase();
+            clearSearchBtn.style.display = query ? 'block' : 'none';
+
+            const st = planes[activePlane];
+            if (query && st.images.length > 0) {
+                const numMatch = query.match(/^#?(\d+)$/);
+                if (numMatch) {
+                    const targetSlice = parseInt(numMatch[1], 10) - 1;
+                    if (targetSlice >= 0 && targetSlice < st.images.length) {
+                        showSlice(targetSlice);
+                    }
+                } else {
+                    const fileIdx = st.images.findIndex(img =>
+                        img.name.toLowerCase().includes(query) ||
+                        (img.ocrText && img.ocrText.includes(query))
+                    );
+                    if (fileIdx !== -1) showSlice(fileIdx);
+                }
+            }
+
+            const fragment = document.createDocumentFragment();
+            let visibleCount = 0;
+
+            GLOSSARY_DATA.forEach(([lat, est, rus]) => {
+                const links = termLinks[lat] || [];
+                if (showOnlyPinned && links.length === 0) return;
+
+                if (query) {
+                    const matchLat = lat.toLowerCase().includes(query);
+                    const matchEst = est.toLowerCase().includes(query);
+                    const matchRus = rus.toLowerCase().includes(query);
+                    const matchLink = links.some(l => `${l.plane} ${l.slice}`.toLowerCase().includes(query));
+                    if (!matchLat && !matchEst && !matchRus && !matchLink) return;
+                }
+
+                visibleCount++;
+                const card = document.createElement('div');
+                card.className = 'term-card';
+
+                const topRow = document.createElement('div');
+                topRow.className = 'term-top';
+
+                const latEl = document.createElement('div');
+                latEl.className = 'term-lat';
+                latEl.textContent = lat;
+
+                const pinBtn = document.createElement('button');
+                pinBtn.className = 'pin-btn';
+                pinBtn.textContent = '📌 + Pin';
+                pinBtn.title = 'Link this term to the currently open slice';
+                pinBtn.addEventListener('click', () => pinTermToCurrentSlice(lat));
+
+                topRow.appendChild(latEl);
+                topRow.appendChild(pinBtn);
+
+                const estEl = document.createElement('div');
+                estEl.className = 'term-est';
+                estEl.textContent = `🇪🇪 ${est}`;
+
+                const rusEl = document.createElement('div');
+                rusEl.className = 'term-rus';
+                rusEl.textContent = `🇷🇺 ${rus}`;
+
+                card.appendChild(topRow);
+                card.appendChild(estEl);
+                card.appendChild(rusEl);
+
+                if (links.length > 0) {
+                    const linksRow = document.createElement('div');
+                    linksRow.className = 'term-links';
+
+                    links.forEach((lnk, idx) => {
+                        const badge = document.createElement('span');
+                        badge.className = 'slice-badge';
+                        const shortPlane = lnk.plane.slice(0, 3).toUpperCase();
+                        badge.innerHTML = `<span>${shortPlane} #${lnk.slice}</span><span class="del-link" title="Remove link">×</span>`;
+
+                        badge.addEventListener('click', e => {
+                            if (e.target.classList.contains('del-link')) {
+                                removeTermLink(lat, idx);
+                            } else {
+                                switchPlane(lnk.plane);
+                                showSlice(lnk.slice - 1);
+                            }
+                        });
+                        linksRow.appendChild(badge);
+                    });
+
+                    card.appendChild(linksRow);
+                }
+
+                fragment.appendChild(card);
+            });
+
+            glossaryList.innerHTML = '';
+            glossaryList.appendChild(fragment);
+            termCountLabel.textContent = `${visibleCount} / ${GLOSSARY_DATA.length} terms`;
+        }
+
+        function pinTermToCurrentSlice(lat) {
+            const st = planes[activePlane];
+            const sliceNum = st.images.length > 0 ? st.index + 1 : 1;
+            if (!termLinks[lat]) termLinks[lat] = [];
+            const exists = termLinks[lat].some(l => l.plane === activePlane && l.slice === sliceNum);
+            if (!exists) {
+                termLinks[lat].push({ plane: activePlane, slice: sliceNum });
+                saveTermLinks();
+                renderGlossary();
+            }
+        }
+
+        function removeTermLink(lat, idx) {
+            if (!termLinks[lat]) return;
+            termLinks[lat].splice(idx, 1);
+            if (termLinks[lat].length === 0) delete termLinks[lat];
+            saveTermLinks();
+            renderGlossary();
+        }
+
+        // Built-in 	 using Tesseract.js to read text inside screenshots and auto-pin terms
+        // Fast Multi-Threaded OCR Scanner (6-8x faster)
+        ocrScanBtn.addEventListener('click', async () => {
+            const st = planes[activePlane];
+            if (st.images.length === 0) {
+                alert('Please load screenshots into the current tab first.');
+                return;
+            }
+            if (typeof Tesseract === 'undefined') {
+                alert('Tesseract OCR library requires an internet connection to load.');
+                return;
+            }
+            if (isScanningOCR) return;
+
+            isScanningOCR = true;
+            ocrStatus.style.display = 'block';
+            ocrScanBtn.classList.add('active');
+            let matchedTotal = 0;
+            let completedSlices = 0;
+
+            // Helper: downscale image & boost contrast in memory for 3x faster OCR
+            async function preprocessImage(url) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width * scale;
+                        canvas.height = img.height * scale;
+                        const ctx = canvas.getContext('2d');
+                        ctx.filter = 'contrast(160%) grayscale(100%)';
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.85));
+                    };
+                    img.src = url;
+                });
+            }
+
+            try {
+                const numWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+                ocrStatus.textContent = `⚡ Initializing ${numWorkers} parallel OCR threads...`;
+
+                const scheduler = Tesseract.createScheduler();
+                // Use fast 'eng+rus' model (covers Latin, Estonian chars & Cyrillic much faster than 4 models)
+                await Promise.all(Array.from({ length: numWorkers }, async () => {
+                    const w = await Tesseract.createWorker(['eng', 'rus']);
+                    scheduler.addWorker(w);
+                }));
+
+                await Promise.all(st.images.map(async (imgObj, i) => {
+                    const fastDataUrl = await preprocessImage(imgObj.url);
+                    const ret = await scheduler.addJob('recognize', fastDataUrl);
+                    const textLower = (ret.data.text || '').toLowerCase();
+                    imgObj.ocrText = textLower;
+
+                    GLOSSARY_DATA.forEach(([lat, est, rus]) => {
+                        const cleanLat = lat.split(':')[0].split('[')[0].trim().toLowerCase();
+                        const cleanEst = est.split('(')[0].trim().toLowerCase();
+                        const cleanRus = rus.split('(')[0].trim().toLowerCase();
+
+                        if (
+                            (cleanLat.length > 4 && textLower.includes(cleanLat)) ||
+                            (cleanEst.length > 4 && textLower.includes(cleanEst)) ||
+                            (cleanRus.length > 4 && textLower.includes(cleanRus))
+                        ) {
+                            if (!termLinks[lat]) termLinks[lat] = [];
+                            const sliceNum = i + 1;
+                            if (!termLinks[lat].some(l => l.plane === activePlane && l.slice === sliceNum)) {
+                                termLinks[lat].push({ plane: activePlane, slice: sliceNum });
+                                matchedTotal++;
+                            }
+                        }
+                    });
+
+                    completedSlices++;
+                    ocrStatus.textContent = `⚡ Fast OCR: ${completedSlices} / ${st.images.length} slices (${matchedTotal} links)...`;
+                }));
+
+                await scheduler.terminate();
+                saveTermLinks();
+                renderGlossary();
+                ocrStatus.textContent = `✅ Done! Linked ${matchedTotal} terms across ${st.images.length} slices.`;
+            } catch (err) {
+                ocrStatus.textContent = '⚠️ Fast OCR interrupted. You can still pin terms manually.';
+            } finally {
+                isScanningOCR = false;
+                ocrScanBtn.classList.remove('active');
+            }
+        });
+
+        searchInput.addEventListener('input', renderGlossary);
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            renderGlossary();
+            searchInput.focus();
+        });
+
+        filterAllBtn.addEventListener('click', () => {
+            showOnlyPinned = false;
+            filterAllBtn.classList.add('active');
+            filterPinnedBtn.classList.remove('active');
+            renderGlossary();
+        });
+
+        filterPinnedBtn.addEventListener('click', () => {
+            showOnlyPinned = true;
+            filterPinnedBtn.classList.add('active');
+            filterAllBtn.classList.remove('active');
+            renderGlossary();
+        });
+
+        toggleGlossaryBtn.addEventListener('click', () => {
+            const collapsed = sidebar.classList.toggle('collapsed');
+            toggleGlossaryBtn.classList.toggle('active', !collapsed);
+        });
+
+        exportLinksBtn.addEventListener('click', () => {
+            const blob = new Blob([JSON.stringify(termLinks, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'ct_glossary_slice_links.json';
+            a.click();
+        });
+
+        importLinksBtn.addEventListener('click', () => importLinksInput.click());
+        importLinksInput.addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    termLinks = Object.assign({}, termLinks, data);
+                    saveTermLinks();
+                    renderGlossary();
+                } catch (err) {
+                    alert('Invalid JSON file.');
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        folderInput.addEventListener('change', e => loadFiles(e.target.files));
+        filesInput.addEventListener('change', e => loadFiles(e.target.files));
+
+        window.addEventListener('dragover', e => {
+            e.preventDefault();
+            dropOverlay.classList.remove('hidden');
+            dropOverlay.classList.add('dragover');
+        });
+
+        window.addEventListener('dragleave', e => {
+            if (e.relatedTarget === null) {
+                dropOverlay.classList.remove('dragover');
+                if (planes[activePlane].images.length > 0) dropOverlay.classList.add('hidden');
+            }
+        });
+
+        window.addEventListener('drop', e => {
+            e.preventDefault();
+            dropOverlay.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                loadFiles(e.dataTransfer.files);
+            } else if (planes[activePlane].images.length > 0) {
+                dropOverlay.classList.add('hidden');
+            }
+        });
+
+        viewport.addEventListener('wheel', e => {
+            e.preventDefault();
+            const st = planes[activePlane];
+            if (st.images.length === 0) return;
+
+            if (e.ctrlKey || e.metaKey) {
+                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+                const newScale = Math.min(Math.max(st.scale * zoomFactor, 0.5), 15);
+
+                const rect = viewport.getBoundingClientRect();
+                const cursorX = e.clientX - rect.left - rect.width / 2;
+                const cursorY = e.clientY - rect.top - rect.height / 2;
+
+                st.panX = cursorX - (cursorX - st.panX) * (newScale / st.scale);
+                st.panY = cursorY - (cursorY - st.panY) * (newScale / st.scale);
+                st.scale = newScale;
+
+                updateTransform();
+            } else {
+                const step = e.deltaY > 0 ? 1 : -1;
+                showSlice(st.index + step);
+            }
+        }, { passive: false });
+
+        viewport.addEventListener('mousedown', e => {
+            if (e.button !== 0 && e.button !== 1) return;
+            const st = planes[activePlane];
+            if (st.images.length === 0) return;
+            isDragging = true;
+            startX = e.clientX - st.panX;
+            startY = e.clientY - st.panY;
+            viewport.classList.add('dragging');
+        });
+
+        window.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            const st = planes[activePlane];
+            st.panX = e.clientX - startX;
+            st.panY = e.clientY - startY;
+            updateTransform();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            viewport.classList.remove('dragging');
+        });
+
+        sliceSlider.addEventListener('input', e => showSlice(parseInt(e.target.value, 10)));
+        prevBtn.addEventListener('click', () => showSlice(planes[activePlane].index - 1));
+        nextBtn.addEventListener('click', () => showSlice(planes[activePlane].index + 1));
+
+        zoomInBtn.addEventListener('click', () => {
+            const st = planes[activePlane];
+            st.scale = Math.min(st.scale * 1.25, 15);
+            updateTransform();
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            const st = planes[activePlane];
+            st.scale = Math.max(st.scale / 1.25, 0.5);
+            updateTransform();
+        });
+
+        brightnessRange.addEventListener('input', e => {
+            brightness = e.target.value;
+            updateFilters();
+        });
+
+        contrastRange.addEventListener('input', e => {
+            contrast = e.target.value;
+            updateFilters();
+        });
+
+        invertBtn.addEventListener('click', () => {
+            inverted = !inverted;
+            invertBtn.classList.toggle('active', inverted);
+            updateFilters();
+        });
+
+        resetBtn.addEventListener('click', resetView);
+
+        function togglePlay() {
+            const st = planes[activePlane];
+            if (st.images.length === 0) return;
+            if (playInterval) {
+                clearInterval(playInterval);
+                playInterval = null;
+                playBtn.textContent = '▶ Play';
+                playBtn.classList.remove('active');
+            } else {
+                playBtn.textContent = '⏸ Pause';
+                playBtn.classList.add('active');
+                playInterval = setInterval(() => {
+                    const curr = planes[activePlane];
+                    if (curr.images.length === 0) return;
+                    showSlice((curr.index + 1) % curr.images.length);
+                }, 120);
+            }
+        }
+
+        playBtn.addEventListener('click', togglePlay);
+
+        window.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+                e.preventDefault();
+                sidebar.classList.remove('collapsed');
+                toggleGlossaryBtn.classList.add('active');
+                searchInput.focus();
+                searchInput.select();
+                return;
+            }
+
+            if (document.activeElement === searchInput) {
+                if (e.key === 'Escape') searchInput.blur();
+                return;
+            }
+
+            if (e.key === '1') { switchPlane('axial'); return; }
+            if (e.key === '2') { switchPlane('coronal'); return; }
+            if (e.key === '3') { switchPlane('sagittal'); return; }
+
+            const st = planes[activePlane];
+            if (st.images.length === 0) return;
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                showSlice(st.index + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                showSlice(st.index - 1);
+            } else if (e.key === 'PageDown') {
+                e.preventDefault();
+                showSlice(st.index + 5);
+            } else if (e.key === 'PageUp') {
+                e.preventDefault();
+                showSlice(st.index - 5);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                showSlice(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                showSlice(st.images.length - 1);
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                togglePlay();
+            } else if (e.key === 'r' || e.key === 'R') {
+                resetView();
+            } else if (e.key === '+' || e.key === '=') {
+                st.scale = Math.min(st.scale * 1.2, 15);
+                updateTransform();
+            } else if (e.key === '-') {
+                st.scale = Math.max(st.scale / 1.2, 0.5);
+                updateTransform();
+            }
+        });
+
+        renderGlossary();
+    </script>
+</body>
+</html>
