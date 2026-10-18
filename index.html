@@ -2,12 +2,8 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CT Viewer & Anatomical Glossary (349 Terms)</title>
-    <!-- JSZip for fast .zip extraction -->
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <!-- Tesseract.js for OCR scanning text inside screenshot images -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CT Viewer & Anatomical Glossary</title>
     <style>
         /* Night Theme (Default) */
         :root, [data-theme="dark"] {
@@ -24,7 +20,7 @@
             --btn-border: #333a4b;
             --btn-hover: #2d3444;
             --control-bg: #1c2029;
-            --overlay-bg: rgba(22, 25, 32, 0.84);
+            --overlay-bg: rgba(22, 25, 32, 0.86);
             --overlay-border: #334155;
             --accent: #38bdf8;
             --accent-hover: #0284c7;
@@ -34,6 +30,9 @@
             --badge-bg: rgba(56, 189, 248, 0.14);
             --badge-border: rgba(56, 189, 248, 0.4);
             --badge-text: #7dd3fc;
+            --badge-ocr-bg: rgba(168, 85, 247, 0.14);
+            --badge-ocr-border: rgba(168, 85, 247, 0.4);
+            --badge-ocr-text: #d8b4fe;
         }
 
         /* Day Theme */
@@ -51,7 +50,7 @@
             --btn-border: #cbd5e1;
             --btn-hover: #e2e8f0;
             --control-bg: #f8fafc;
-            --overlay-bg: rgba(255, 255, 255, 0.9);
+            --overlay-bg: rgba(255, 255, 255, 0.92);
             --overlay-border: #94a3b8;
             --accent: #0284c7;
             --accent-hover: #0369a1;
@@ -61,6 +60,9 @@
             --badge-bg: rgba(2, 132, 199, 0.12);
             --badge-border: rgba(2, 132, 199, 0.35);
             --badge-text: #0369a1;
+            --badge-ocr-bg: rgba(126, 34, 206, 0.1);
+            --badge-ocr-border: rgba(126, 34, 206, 0.35);
+            --badge-ocr-text: #6b21a8;
         }
 
         * {
@@ -175,11 +177,17 @@
             align-items: center;
             gap: 5px;
             white-space: nowrap;
+            font-family: inherit;
         }
 
         .btn:hover {
             background-color: var(--btn-hover);
             border-color: var(--accent);
+        }
+
+        .btn:focus-visible, .plane-tab:focus-visible, .lang-btn:focus-visible, .pill-btn:focus-visible, .pin-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 1px;
         }
 
         .btn-primary {
@@ -235,8 +243,6 @@
             position: relative;
             overflow: hidden;
             display: flex;
-            align-items: center;
-            justify-content: center;
             background: var(--viewport-bg);
             cursor: grab;
             touch-action: none;
@@ -244,6 +250,212 @@
 
         .viewport.dragging {
             cursor: grabbing;
+        }
+
+        /* Multi-Screen 1x / 3x Grid */
+        .panes-grid {
+            flex: 1;
+            display: flex;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .panes-grid.mode-3x {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2px;
+            background-color: var(--panel-border);
+        }
+
+        .plane-pane {
+            position: relative;
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--viewport-bg);
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .plane-pane.visible {
+            display: flex;
+        }
+
+        .panes-grid.mode-3x .plane-pane {
+            border: 2px solid transparent;
+            transition: border-color 0.15s;
+        }
+
+        .panes-grid.mode-3x .plane-pane.active-pane {
+            border-color: var(--accent);
+        }
+
+        .pane-header {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            right: 8px;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .panes-grid.mode-3x .pane-header {
+            display: flex;
+        }
+
+        .pane-title-badge {
+            background: var(--overlay-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--accent);
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 5px;
+            backdrop-filter: blur(4px);
+        }
+
+        .pane-slice-badge {
+            background: var(--overlay-bg);
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            font-family: monospace;
+            font-size: 11.5px;
+            padding: 3px 7px;
+            border-radius: 5px;
+            backdrop-filter: blur(4px);
+        }
+
+        .pane-canvas-wrap {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .pane-empty-msg {
+            color: var(--text-muted);
+            font-size: 13px;
+            text-align: center;
+            padding: 12px;
+        }
+
+        .slice-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transform-origin: center center;
+            pointer-events: none;
+            display: none;
+        }
+
+        .slice-img.pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .pane-footer {
+            display: none;
+            padding: 5px 10px;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--panel-border);
+            align-items: center;
+            gap: 6px;
+            z-index: 6;
+        }
+
+        .panes-grid.mode-3x .pane-footer {
+            display: flex;
+        }
+
+        .pane-slider {
+            flex: 1;
+            accent-color: var(--accent);
+            height: 6px;
+            cursor: pointer;
+        }
+
+        /* 3x Magnifying Glass (Loupe) */
+        .loupe {
+            position: fixed;
+            width: 184px;
+            height: 184px;
+            border-radius: 50%;
+            border: 2.5px solid var(--accent);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+            background: #050608;
+        }
+
+        .loupe.visible {
+            display: block;
+        }
+
+        .loupe-img {
+            position: absolute;
+            transform-origin: top left;
+            pointer-events: none;
+            max-width: none !important;
+            max-height: none !important;
+        }
+
+        .loupe-img.pixelated {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .loupe-crosshair {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .loupe-crosshair::before,
+        .loupe-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(56, 189, 248, 0.35);
+        }
+
+        .loupe-crosshair::before {
+            left: 50%;
+            top: 38%;
+            bottom: 38%;
+            width: 1px;
+            transform: translateX(-50%);
+        }
+
+        .loupe-crosshair::after {
+            top: 50%;
+            left: 38%;
+            right: 38%;
+            height: 1px;
+            transform: translateY(-50%);
+        }
+
+        .loupe-badge {
+            position: absolute;
+            bottom: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(11, 13, 16, 0.78);
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 700;
+            font-family: monospace;
+            padding: 1px 6px;
+            border-radius: 8px;
+            border: 1px solid rgba(56, 189, 248, 0.35);
         }
 
         /* Clean Welcome Overlay */
@@ -260,7 +472,7 @@
             padding: 24px;
             background-color: var(--overlay-bg);
             backdrop-filter: blur(4px);
-            z-index: 10;
+            z-index: 15;
         }
 
         .drop-overlay.dragover {
@@ -290,19 +502,9 @@
             justify-content: center;
         }
 
-        #sliceImage {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            transform-origin: center center;
-            will-change: transform, filter;
-            pointer-events: none;
-            display: none;
-        }
-
         /* Glossary Sidebar */
         .sidebar {
-            width: 400px;
+            width: 410px;
             background-color: var(--panel-bg);
             border-left: 1px solid var(--panel-border);
             display: flex;
@@ -383,6 +585,7 @@
             border-radius: 4px;
             font-size: 11px;
             cursor: pointer;
+            font-family: inherit;
         }
 
         .pill-btn:hover {
@@ -449,6 +652,14 @@
             color: var(--accent);
         }
 
+        .term-alias {
+            font-weight: 400;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 1px;
+        }
+
         .pin-btn {
             background: var(--btn-bg);
             border: 1px solid var(--btn-border);
@@ -458,6 +669,7 @@
             font-size: 11px;
             cursor: pointer;
             white-space: nowrap;
+            font-family: inherit;
         }
 
         .pin-btn:hover {
@@ -465,15 +677,33 @@
             border-color: var(--accent);
         }
 
-        .term-est {
+        .term-est, .term-rus {
             font-size: 12px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .term-est {
             color: var(--text-secondary);
             margin-bottom: 2px;
         }
 
         .term-rus {
-            font-size: 12px;
             color: var(--text-muted);
+        }
+
+        .lang-tag {
+            display: inline-block;
+            font-size: 9.5px;
+            font-weight: 700;
+            font-family: monospace;
+            padding: 1px 4px;
+            border-radius: 3px;
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            color: var(--text-muted);
+            flex-shrink: 0;
         }
 
         .term-links {
@@ -497,8 +727,15 @@
             gap: 5px;
         }
 
+        .slice-badge.ocr-link {
+            background: var(--badge-ocr-bg);
+            border-color: var(--badge-ocr-border);
+            color: var(--badge-ocr-text);
+        }
+
         .slice-badge:hover {
             background: var(--accent);
+            border-color: var(--accent);
             color: #ffffff;
         }
 
@@ -554,8 +791,13 @@
                 gap: 6px;
             }
 
-            .control-item.desktop-only {
-                display: none;
+            .desktop-only {
+                display: none !important;
+            }
+
+            .panes-grid.mode-3x {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(3, 1fr);
             }
 
             .sidebar {
@@ -594,29 +836,38 @@
             <div class="title">CT Viewer</div>
 
             <div class="plane-tabs">
-                <button class="plane-tab active" data-plane="axial">
+                <button type="button" class="plane-tab active" data-plane="axial">
                     <span id="tab-label-axial">Axial</span> <span class="plane-count" id="count-axial">(0)</span>
                 </button>
-                <button class="plane-tab" data-plane="coronal">
+                <button type="button" class="plane-tab" data-plane="coronal">
                     <span id="tab-label-coronal">Coronal</span> <span class="plane-count" id="count-coronal">(0)</span>
                 </button>
-                <button class="plane-tab" data-plane="sagittal">
+                <button type="button" class="plane-tab" data-plane="sagittal">
                     <span id="tab-label-sagittal">Sagittal</span> <span class="plane-count" id="count-sagittal">(0)</span>
                 </button>
             </div>
 
-            <!-- Single Unified Upload Button -->
-            <label class="btn btn-primary" for="unifiedInput" id="loadBtnToolbar">
-                📁 Load Screenshots or Folder
-            </label>
+            <!-- 2.2 Multi-Screen 3x Workstation Toggle -->
+            <button type="button" class="btn" id="multiViewBtn" title="3x Multi-Planar View (Axial + Coronal + Sagittal)">
+                ⊞ 3x
+            </button>
+
+            <!-- Accessible File & Folder Upload Buttons -->
+            <button type="button" class="btn btn-primary" id="loadBtnToolbar">
+                📁 Load Files / ZIP
+            </button>
+            <button type="button" class="btn desktop-only" id="loadFolderBtnToolbar">
+                📂 Folder
+            </button>
             <input type="file" id="unifiedInput" multiple>
+            <input type="file" id="folderInput" webkitdirectory multiple>
         </div>
 
         <div class="toolbar-group">
             <div class="control-item">
                 <span>🔍 <b id="zoomLabel">100%</b></span>
-                <button class="btn" id="zoomOutBtn" style="padding: 1px 7px;">−</button>
-                <button class="btn" id="zoomInBtn" style="padding: 1px 7px;">+</button>
+                <button type="button" class="btn" id="zoomOutBtn" style="padding: 1px 7px;">−</button>
+                <button type="button" class="btn" id="zoomInBtn" style="padding: 1px 7px;">+</button>
             </div>
 
             <div class="control-item desktop-only">
@@ -629,33 +880,87 @@
                 <input type="range" id="contrastRange" min="30" max="250" value="100">
             </div>
 
-            <button class="btn" id="invertBtn">Invert</button>
-            <button class="btn" id="resetBtn">Reset</button>
-            <button class="btn" id="themeToggleBtn">☀️ Day</button>
+            <button type="button" class="btn" id="invertBtn">Invert</button>
+            <button type="button" class="btn" id="pixelatedBtn" title="Crisp Pixel Rendering">🏁 Pixel</button>
+            <button type="button" class="btn" id="resetBtn">Reset</button>
+            <button type="button" class="btn" id="themeToggleBtn">☀️ Day</button>
 
             <!-- Interface Language Switcher (EN / ET / RU) -->
-            <div class="lang-switch" title="Interface Language">
-                <button class="lang-btn active" data-lang="en">EN</button>
-                <button class="lang-btn" data-lang="et">ET</button>
-                <button class="lang-btn" data-lang="ru">RU</button>
+            <div class="lang-switch" id="langSwitch" title="Interface Language">
+                <button type="button" class="lang-btn active" data-lang="en">EN</button>
+                <button type="button" class="lang-btn" data-lang="et">ET</button>
+                <button type="button" class="lang-btn" data-lang="ru">RU</button>
             </div>
 
-            <button class="btn active" id="toggleGlossaryBtn">📖 Glossary</button>
+            <button type="button" class="btn active" id="toggleGlossaryBtn">📖 Glossary</button>
         </div>
     </div>
 
     <div class="workspace">
         <div class="viewport" id="viewport">
-            <img id="sliceImage" alt="CT Slice">
+            <!-- 1x / 3x Planes Grid -->
+            <div class="panes-grid" id="panesGrid">
+                <div class="plane-pane visible active-pane" data-plane="axial" id="pane-axial">
+                    <div class="pane-header">
+                        <span class="pane-title-badge" id="pane-title-axial">Axial</span>
+                        <span class="pane-slice-badge" id="pane-counter-axial">0 / 0</span>
+                    </div>
+                    <div class="pane-canvas-wrap">
+                        <img class="slice-img" id="img-axial" alt="Axial Slice">
+                        <div class="pane-empty-msg" id="empty-axial">No Axial slices</div>
+                    </div>
+                    <div class="pane-footer">
+                        <input type="range" class="pane-slider" id="slider-axial" min="0" max="0" value="0" disabled>
+                    </div>
+                </div>
 
-            <!-- Clean Single-Option Welcome Overlay -->
+                <div class="plane-pane" data-plane="coronal" id="pane-coronal">
+                    <div class="pane-header">
+                        <span class="pane-title-badge" id="pane-title-coronal">Coronal</span>
+                        <span class="pane-slice-badge" id="pane-counter-coronal">0 / 0</span>
+                    </div>
+                    <div class="pane-canvas-wrap">
+                        <img class="slice-img" id="img-coronal" alt="Coronal Slice">
+                        <div class="pane-empty-msg" id="empty-coronal">No Coronal slices</div>
+                    </div>
+                    <div class="pane-footer">
+                        <input type="range" class="pane-slider" id="slider-coronal" min="0" max="0" value="0" disabled>
+                    </div>
+                </div>
+
+                <div class="plane-pane" data-plane="sagittal" id="pane-sagittal">
+                    <div class="pane-header">
+                        <span class="pane-title-badge" id="pane-title-sagittal">Sagittal</span>
+                        <span class="pane-slice-badge" id="pane-counter-sagittal">0 / 0</span>
+                    </div>
+                    <div class="pane-canvas-wrap">
+                        <img class="slice-img" id="img-sagittal" alt="Sagittal Slice">
+                        <div class="pane-empty-msg" id="empty-sagittal">No Sagittal slices</div>
+                    </div>
+                    <div class="pane-footer">
+                        <input type="range" class="pane-slider" id="slider-sagittal" min="0" max="0" value="0" disabled>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.3 3x Magnifying Glass (Loupe) -->
+            <div class="loupe" id="loupe">
+                <img class="loupe-img" id="loupeImg" alt="">
+                <div class="loupe-crosshair"></div>
+                <div class="loupe-badge">3.0×</div>
+            </div>
+
+            <!-- Welcome / Drop Overlay -->
             <div class="drop-overlay" id="dropOverlay">
                 <div class="drop-icon">🩻</div>
-                <div class="drop-title" id="dropTitle">Load Screenshots or Folder</div>
+                <div class="drop-title" id="dropTitle">Load Screenshots, Folder or Archive</div>
                 <div class="drop-actions">
-                    <label class="btn btn-primary" for="unifiedInput" id="loadBtnOverlay" style="font-size: 14px; padding: 10px 20px;">
-                        📁 Load Screenshots or Folder
-                    </label>
+                    <button type="button" class="btn btn-primary" id="loadBtnOverlay" style="font-size: 14px; padding: 10px 20px;">
+                        📁 Load Files / ZIP
+                    </button>
+                    <button type="button" class="btn desktop-only" id="loadFolderBtnOverlay" style="font-size: 14px; padding: 10px 20px;">
+                        📂 Select Folder
+                    </button>
                 </div>
             </div>
         </div>
@@ -664,16 +969,17 @@
             <div class="sidebar-header">
                 <div class="search-box">
                     <input type="text" id="searchInput" class="search-input" placeholder="Search Latin, Eesti, Русский or #slice...">
-                    <button class="clear-search" id="clearSearchBtn">✕</button>
+                    <button type="button" class="clear-search" id="clearSearchBtn">✕</button>
                 </div>
                 <div class="sidebar-meta">
-                    <span id="termCountLabel">349 terms</span>
+                    <span id="termCountLabel">0 terms</span>
                     <div class="filter-pills">
-                        <button class="pill-btn active" id="filterAllBtn">All</button>
-                        <button class="pill-btn" id="filterPinnedBtn">Pinned</button>
-                        <button class="pill-btn" id="ocrScanBtn">🔍 Auto-Scan (OCR)</button>
-                        <button class="pill-btn" id="exportLinksBtn">Export</button>
-                        <button class="pill-btn" id="importLinksBtn">Import</button>
+                        <button type="button" class="pill-btn active" id="filterAllBtn">All</button>
+                        <button type="button" class="pill-btn" id="filterPinnedBtn">Pinned</button>
+                        <button type="button" class="pill-btn" id="ocrScanBtn">🔍 Auto-Scan (OCR)</button>
+                        <button type="button" class="pill-btn" id="clearOcrBtn" title="Clear only OCR auto-links">🧹 Clear OCR</button>
+                        <button type="button" class="pill-btn" id="exportLinksBtn">Export</button>
+                        <button type="button" class="pill-btn" id="importLinksBtn">Import</button>
                         <input type="file" id="importLinksInput" accept=".json">
                     </div>
                 </div>
@@ -685,36 +991,109 @@
 
     <!-- Bottom Slice Navigation Bar -->
     <div class="bottom-bar">
-        <button class="btn" id="prevBtn">◀</button>
-        <button class="btn" id="playBtn">▶ Play</button>
-        <button class="btn" id="nextBtn">▶</button>
+        <button type="button" class="btn" id="prevBtn">◀</button>
+        <button type="button" class="btn" id="playBtn">▶ Play</button>
+        <button type="button" class="btn" id="nextBtn">▶</button>
         <div class="slice-counter" id="sliceCounter">Slice: 0 / 0</div>
         <input type="range" id="sliceSlider" min="0" max="0" value="0" disabled>
     </div>
 
     <script>
-        const GLOSSARY_DATA = [["Adhaesio interthalamica", "Talamustevaheline liide", "Межталамическое сращение"], ["Ala major", "Suur tiib (kiilluu suur tiib)", "Большое крыло (клиновидной кости)"], ["Ala minor", "Väike tiib (kiilluu väike tiib)", "Малое крыло (клиновидной кости)"], ["Ala nasi", "Ninatiib", "Крыло носа"], ["Angulus pontocerebellaris", "Silla-väikeaju nurk", "Мостомозжечковый угол"], ["Anulus tympanicus", "Trummivõru", "Барабанное кольцо"], ["Apertura ductus nasolacrimalis", "Nina-pisarajuha avaus", "Апертура носослёзного протока"], ["Apertura externa canalis carotidis", "Unearterikanali välimine avaus", "Наружная апертура сонного канала"], ["Apertura interna canalis carotidis", "Unearterikanali sisemine avaus", "Внутренняя апертура сонного канала"], ["Apertura lateralis ventriculi quarti", "Neljanda vatsakese külgmine avaus (Luschka ava)", "Латеральная апертура четвёртого желудочка"], ["Apertura mediana ventriculi quarti", "Neljanda vatsakese keskmine avaus (Magendie ava)", "Срединная апертура четвёртого желудочка"], ["Apertura sinus frontalis", "Otsmikusiinuse avaus", "Апертура лобной пазухи"], ["Apertura sinus ossis sphenoidei", "Kiilluusiinuse avaus", "Апертура клиновидной пазухи"], ["Apex partis petrosae", "Kaljuosa tipp", "Верхушка каменистой части"], ["Aquaeductus mesencephali", "Keskaju veejuha", "Водопровод среднего мозга"], ["Arcus anterior atlantis", "Kandelüli eesmine kaar", "Передняя дуга атланта"], ["Arcus posterior atlantis", "Kandelüli tagumine kaar", "Задняя дуга атланта"], ["Arcus superciliaris", "Kulmukaar", "Надбровная дуга"], ["Arcus zygomaticus", "Sarnakaar", "Скуловая дуга"], ["Arteria basilaris", "Basilaararter (põhimikuarter)", "Базилярная артерия"], ["Arteria cerebri anterior: Pars postcommunicalis; Segmentum A2 [A2]", "Eesmine ajuarter: ühendusejärgne osa (A2-segment)", "Передняя мозговая артерия: посткоммуникационная часть (сегмент А2)"], ["Arteria cerebri anterior: Pars precommunicalis; Segmentum A1 [A1]", "Eesmine ajuarter: ühenduseelne osa (A1-segment)", "Передняя мозговая артерия: предкоммуникационная часть (сегмент А1)"], ["Arteria cerebri media: Pars insularis; Segmentum M2 [M2]", "Keskmine ajuarter: saareosa (M2-segment)", "Средняя мозговая артерия: островковая часть (сегмент M2)"], ["Arteria cerebri media: Pars sphenoidalis; Pars horizontalis; Segmentum M1 [M1]", "Keskmine ajuarter: kiilluuosa / horisontaalosa (M1-segment)", "Средняя мозговая артерия: клиновидная / горизонтальная часть (сегмент М1)"], ["Arteria cerebri posterior: Pars postcommunicalis; Segmentum P2 [P2]", "Tagumine ajuarter: ühendusejärgne osa (P2-segment)", "Задняя мозговая артерия: посткоммуникационная часть (сегмент Р2)"], ["Arteria cerebri posterior: Pars precommunicalis; Segmentum P1 [P1]", "Tagumine ajuarter: ühenduseelne osa (P1-segment)", "Задняя мозговая артерия: предкоммуникационная часть (сегмент Р1)"], ["Arteria communicans anterior", "Eesmine ühendusarter", "Передняя соединительная артерия"], ["Arteria communicans posterior", "Tagumine ühendusarter", "Задняя соединительная артерия"], ["Arteria inferior posterior cerebelli", "Väikeaju alumine tagumine arter", "Задняя нижняя мозжечковая артерия"], ["Arteria superior cerebelli", "Väikeaju ülemine arter", "Верхняя мозжечковая артерия"], ["Arteria vertebralis: Segmentum extraduralis; Segmentum atlanticum (V3) [V3]", "Selgrooarter: kõvakestaväline / kandelüliosa (V3-segment)", "Позвоночная артерия: экстрадуральный / атлантовый сегмент (V3)"], ["Arteria vertebralis: Segmentum foraminalis (V2) [V2]", "Selgrooarter: ristijätkemulkude osa (V2-segment)", "Позвоночная артерия: фораминальный сегмент (V2)"], ["Arteria vertebralis: Segmentum intraduralis; Segmentum intracranialis (V4) [V4]", "Selgrooarter: kõvakestasisene / koljusisene osa (V4-segment)", "Позвоночная артерия: интрадуральный / внутричерепной сегмент (V4)"], ["Articulatio atlantoaxialis mediana", "Keskmine kande-telglüliliiges", "Срединный атлантоосевой сустав"], ["Articulatio atlantooccipitalis", "Kandelüli-kuklaluuliiges", "Атлантозатылочный сустав"], ["Articulatio temporomandibularis", "Alalõualiiges", "Височно-нижнечелюстной сустав"], ["Atlas", "Kandelüli (atlas)", "Атлант (первый шейный позвонок)"], ["Atrium meatus medii", "Keskmise ninakäigu esik (aatrium)", "Преддверие среднего носового хода"], ["Atrium ventriculi lateralis", "Külgvatsakese kolmnurk (aatrium)", "Преддверие (треугольник) бокового желудочка"], ["Auris", "Kõrv", "Ухо"], ["Axis", "Telglüli (aksis)", "Осевой позвонок (аксис)"], ["Basis cranii", "Koljupõhimik", "Основание черепа"], ["Bucca", "Põsk", "Щека"], ["Bulla ethmoidea", "Sõelluupõis", "Решётчатый пузырёк"], ["Bulla ethmoidea ossea", "Luuline sõelluupõis", "Костный решётчатый пузырёк"], ["Calcar avis", "Kukekannus", "Птичья шпора"], ["Calvaria", "Koljuvõlv", "Свод черепа"], ["Canales diploici", "Diploekanalid", "Диплоические каналы"], ["Canales incisivi", "Lõikehambakanalid", "Резцовые каналы"], ["Canalis carotidis", "Unearterikanal", "Сонный канал"], ["Canalis condylaris", "Põndakanal", "Мыщелковый канал"], ["Canalis facialis", "Näonärvikanal", "Лицевой канал"], ["Canalis hypoglossus", "Keelealuse närvi kanal", "Подъязычный канал"], ["Canalis infraorbitalis", "Silmakoopaalune kanal", "Подглазничный канал"], ["Canalis mandibulae", "Alalõuakanal", "Канал нижней челюсти"], ["Canalis musculotubarius", "Lihase-kuulmetõri kanal", "Мышечно-трубный канал"], ["Canalis nasolacrimalis", "Nina-pisarakanal", "Носослёзный канал"], ["Canalis opticus", "Nägemisnärvikanal", "Зрительный канал"], ["Canalis palatinus major", "Suur suulaekanal", "Большой нёбный канал"], ["Canalis pterygoideus", "Tiibjätkekanal", "Крыловидный канал"], ["Capsula interna", "Sisemine kihn", "Внутренняя капсула"], ["Caput", "Pea", "Голова"], ["Caput nuclei caudati", "Sabatuuma pea", "Головка хвостатого ядра"], ["Cauda nuclei caudati", "Sabatuuma saba", "Хвост хвостатого ядра"], ["Cavitas cranii", "Koljuõõs", "Полость черепа"], ["Cavitas orbitae", "Silmakoobas", "Глазница (полость глазницы)"], ["Cavitas oris", "Suuõõs", "Полость рта"], ["Cavitas tympani cranii", "Trummiõõs", "Барабанная полость"], ["Cavum trigeminale", "Kolmiknärviõõs", "Тройничная полость"], ["Cellulae ethmoideae anteriores", "Eesmised sõelluurakud", "Передние решётчатые ячейки"], ["Cellulae ethmoideae mediae", "Keskmised sõelluurakud", "Средние решётчатые ячейки"], ["Cellulae ethmoideae posteriores", "Tagumised sõelluurakud", "Задние решётчатые ячейки"], ["Cerebellum", "Väikeaju", "Мозжечок"], ["Chiasma opticum", "Nägemisristmik", "Зрительный перекрёст"], ["Choana", "Tagasõõre (koaan)", "Хоана"], ["Choana cranii", "Kolju tagasõõre (koaan)", "Хоана черепа"], ["Circulus arteriosus cerebri", "Suuraju arteriaalring (Willise ring)", "Артериальный круг большого мозга"], ["Clivus", "Nõlv (kliivus)", "Скат"], ["Collum", "Kael", "Шея"], ["Collum mandibulae", "Alalõuakael", "Шейка нижней челюсти"], ["Commissura anterior", "Eesmine komissuur", "Передняя спайка"], ["Commissura posterior", "Tagumine komissuur", "Задняя спайка"], ["Concha inferior nasi", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha media nasi", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis inferior", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha nasalis media", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis superior", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Concha superior nasi", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Condylus mandibulae", "Alalõuapõnt (alalõuapea)", "Мыщелок (головка) нижней челюсти"], ["Condylus occipitalis", "Kuklapõnt", "Затылочный мыщелок"], ["Confluens sinuum", "Siinuste ühinemiskoht", "Сток синусов"], ["Cornu frontale", "Otsmikusarv (eesmine sarv)", "Лобный (передний) рог"], ["Cornu occipitale", "Kuklasarv (tagumine sarv)", "Затылочный (задний) рог"], ["Cornu temporale", "Oimusarv (alumine sarv)", "Височный (нижний) рог"], ["Corona radiata", "Kiirtepärg", "Лучистый венец"], ["Corpus adiposum buccae", "Põse rasvkeha", "Жировое тело щеки"], ["Corpus nuclei caudati", "Sabatuuma keha", "Тело хвостатого ядра"], ["Corpus ossis sphenoidei", "Kiilluu keha", "Тело клиновидной кости"], ["Cranium", "Kolju", "Череп"], ["Crista frontalis", "Otsmikuhari", "Лобный гребень"], ["Crista galli", "Kukehari", "Петушиный гребень"], ["Crista lacrimalis posterior", "Tagumine pisarahari", "Задний слёзный гребень"], ["Crista nasalis maxillae", "Ülalõualuu ninahari", "Носовой гребень верхней челюсти"], ["Crista nasalis ossis palatini", "Suulaeluu ninahari", "Носовой гребень нёбной кости"], ["Crista occipitalis externa", "Välimine kuklahari", "Наружный затылочный гребень"], ["Crista occipitalis interna", "Sisemine kuklahari", "Внутренний затылочный гребень"], ["Crista sphenoidea", "Kiilluuhari", "Клиновидный гребень"], ["Dens axis", "Telglüli hammas", "Зуб осевого позвонка"], ["Dentes", "Hambad", "Зубы"], ["Diaphragma sellae", "Sadulavahelihas (saduladiafragma)", "Диафрагма седла"], ["Diencephalon", "Vaheaju", "Промежуточный мозг"], ["Diploe", "Diploe", "Диплоэ"], ["Dorsum nasi", "Ninaselg", "Спинка носа"], ["Dorsum sellae", "Sadulaselg", "Спинка седла"], ["Encephalon", "Peaaju", "Головной мозг"], ["Facies", "Nägu", "Лицо"], ["Facies anterior maxillae", "Ülalõualuu eesmine pind", "Передняя поверхность верхней челюсти"], ["Facies articularis superior atlantis", "Kandelüli ülemine liigesepind", "Верхняя суставная поверхность атланта"], ["Facies infratemporalis maxillae", "Ülalõualuu oimualune pind", "Подвисочная поверхность верхней челюсти"], ["Facies nasalis maxillae", "Ülalõualuu ninapind", "Носовая поверхность верхней челюсти"], ["Facies orbitalis maxillae", "Ülalõualuu silmakoopapind", "Глазничная поверхность верхней челюсти"], ["Falx cerebelli", "Väikeajusirp", "Серп мозжечка"], ["Falx cerebri", "Suurajusirp", "Серп большого мозга"], ["Fissura chorioidea", "Soonpõimikulõhe", "Сосудистая щель"], ["Fissura orbitalis inferior", "Alumine silmakoopalõhe", "Нижняя глазничная щель"], ["Fissura orbitalis superior", "Ülemine silmakoopalõhe", "Верхняя глазничная щель"], ["Flocculus [H X]", "Flokulus (väikeajututt) [H X]", "Клочок мозжечка [Н Х]"], ["Foramen alveolare inferius", "Alalõuamulk", "Нижнее альвеолярное отверстие (отверстие нижней челюсти)"], ["Foramen caecum ossis frontalis", "Otsmikuluu umbmulk", "Слепое отверстие лобной кости"], ["Foramen infraorbitale", "Silmakoopaalune mulk", "Подглазничное отверстие"], ["Foramen interventriculare", "Vatsakestevaheline mulk", "Межжелудочковое отверстие"], ["Foramen jugulare", "Kägimulk", "Яремное отверстие"], ["Foramen lacerum", "Rebimulk", "Рваное отверстие"], ["Foramen magnum", "Suur kuklamulk", "Большое (затылочное) отверстие"], ["Foramen mastoideum", "Nibujätkemulk", "Сосцевидное отверстие"], ["Foramen ovale", "Ovaalmulk", "Овальное отверстие"], ["Foramen palatinum majus", "Suur suulaemulk", "Большое нёбное отверстие"], ["Foramen parietale", "Kiiruluumulk", "Теменное отверстие"], ["Foramen rotundum", "Ümarmulk", "Круглое отверстие"], ["Foramen sphenopalatinum", "Kiilluu-suulaemulk", "Клиновидно-нёбное отверстие"], ["Foramen spinosum", "Ogamulk", "Остистое отверстие"], ["Foramen stylomastoideum", "Tikkel-nibujätkemulk", "Шилососцевидное отверстие"], ["Foramen transversarium", "Ristijätkemulk", "Поперечное отверстие"], ["Fornix", "Ajukaar (võlv)", "Свод"], ["Fossa anterior cranii", "Eesmine koljuauk", "Передняя черепная ямка"], ["Fossa condylaris", "Põndaauk", "Мыщелковая ямка"], ["Fossa incisiva", "Lõikehambaauk", "Резцовая ямка"], ["Fossa jugularis", "Kägiauk", "Яремная ямка"], ["Fossa mandibularis", "Alalõuaauk", "Нижнечелюстная ямка"], ["Fossa media cranii", "Keskmine koljuauk", "Средняя черепная ямка"], ["Fossa posterior cranii", "Tagumine koljuauk", "Задняя черепная ямка"], ["Fossa pterygoidea", "Tiibjätkeauk", "Крыловидная ямка"], ["Fossa scaphoidea", "Lootsikauk (paatjas auk)", "Ладьевидная ямка"], ["Fossula petrosa", "Kaljulohuke", "Каменистая ямочка"], ["Fovea pterygoidea", "Tiibjätkelohk", "Крыловидная ямка (нижней челюсти)"], ["Foveolae granulares", "Granulatsioonilohukesed", "Ямочки грануляций"], ["Frons cranii", "Otsmik (laup)", "Лоб"], ["Genu corporis callosi", "Mõhnkeha põlv", "Колено мозолистого тела"], ["Gingiva", "Ige", "Десна"], ["Glabella", "Kulmudevahe (glabella)", "Глабелла (надпереносье)"], ["Glandula parotidea", "Kõrvasüljenääre", "Околоушная слюнная железа"], ["Glandula pinealis", "Käbikeha (epifüüs)", "Шишковидное тело (эпифиз)"], ["Granulationes arachnoideae", "Ämblikuvõrkkesta granulatsioonid", "Грануляции паутинной оболочки"], ["Hamulus pterygoideus", "Tiibjätkekonks", "Крыловидный крючок"], ["Hemisphaerium cerebelli", "Väikeaju poolkera", "Полушарие мозжечка"], ["Hemisphaerium cerebri", "Suuraju poolkera", "Полушарие большого мозга"], ["Hiatus maxillae", "Ülalõuaurkehaigutus", "Расщелина верхнечелюстной пазухи"], ["Hypophysis", "Ajuripats (hüpofüüs)", "Гипофиз"], ["Hypothalamus", "Hüpotalamus", "Гипоталамус"], ["Incisura jugularis ossis occipitalis", "Kuklaluu kägisälk", "Яремная вырезка затылочной кости"], ["Incisura jugularis ossis temporalis", "Oimuluu kägisälk", "Яремная вырезка височной кости"], ["Incisura mandibulae", "Alalõuasälk", "Вырезка нижней челюсти"], ["Incisura mastoidea", "Nibujätkesälk", "Сосцевидная вырезка"], ["Incisura pterygoidea", "Tiibjätkesälk", "Крыловидная вырезка"], ["Incisura supraorbitalis", "Silmakoopaülene sälk", "Надглазничная вырезка"], ["Incisura tentorii", "Väikeajutelgi sälk", "Вырезка намёта мозжечка"], ["Infundibulum ethmoideum", "Sõelluulehter", "Решётчатая воронка"], ["Infundibulum ethmoideum osseum", "Luuline sõelluulehter", "Костная решётчатая воронка"], ["Insula", "Saar (Reili saar)", "Островок (островковая доля)"], ["Jugum sphenoideum", "Kiilluuike", "Клиновидное возвышение"], ["Labium superius oris", "Ülahuul", "Верхняя губа"], ["Labyrinthus ethmoideus", "Sõelluulabürint", "Решётчатый лабиринт"], ["Lamina cribrosa", "Sõellest", "Решётчатая пластинка"], ["Lamina horizontalis ossis palatini", "Suulaeluu rõhtlest", "Горизонтальная пластинка нёбной кости"], ["Lamina lateralis processus pterygoidei", "Tiibjätke külgmine lest", "Латеральная пластинка крыловидного отростка"], ["Lamina medialis processus pterygoidei", "Tiibjätke keskmine lest", "Медиальная пластинка крыловидного отростка"], ["Lamina orbitalis labyrinthi ethmoidei", "Sõelluulabürindi silmakoopalest", "Глазничная пластинка решётчатого лабиринта"], ["Lamina perpendicularis ossis ethmoidei", "Sõelluu püstlest", "Перпендикулярная пластинка решётчатой кости"], ["Lamina perpendicularis ossis palatini", "Suulaeluu püstlest", "Перпендикулярная пластинка нёбной кости"], ["Lingua", "Keel", "Язык"], ["Lobus anterior cerebelli", "Väikeaju eesmine sagar", "Передняя доля мозжечка"], ["Lobus frontalis", "Otsmikusagar", "Лобная доля"], ["Lobus occipitalis", "Kuklasagar", "Затылочная доля"], ["Lobus parietalis", "Kiirusagar", "Теменная доля"], ["Lobus posterior cerebelli", "Väikeaju tagumine sagar", "Задняя доля мозжечка"], ["Lobus temporalis", "Oimusagar", "Височная доля"], ["Margo infraorbitalis", "Silmakoopa alumine serv", "Подглазничный край"], ["Margo lateralis orbitae", "Silmakoopa külgmine serv", "Латеральный край глазницы"], ["Margo medialis orbitae", "Silmakoopa keskmine serv", "Медиальный край глазницы"], ["Margo supraorbitalis", "Silmakoopa ülemine serv", "Надглазничный край"], ["Massa lateralis atlantis", "Kandelüli külgmass", "Латеральная масса атланта"], ["Maxilla", "Ülalõualuu", "Верхняя челюсть"], ["Meatus acusticus externus cranii", "Välimine kuulmekäik", "Наружный слуховой проход"], ["Meatus acusticus internus", "Sisemine kuulmekäik", "Внутренний слуховой проход"], ["Meatus communis nasi", "Ühine ninakäik", "Общий носовой ход"], ["Meatus inferior nasi", "Alumine ninakäik", "Нижний носовой ход"], ["Meatus medius nasi", "Keskmine ninakäik", "Средний носовой ход"], ["Meatus nasalis communis cranii", "Ühine ninakäik (koljus)", "Общий носовой ход (черепа)"], ["Meatus nasalis inferior cranii", "Alumine ninakäik (koljus)", "Нижний носовой ход (черепа)"], ["Meatus nasalis medius cranii", "Keskmine ninakäik (koljus)", "Средний носовой ход (черепа)"], ["Meatus nasalis superior cranii", "Ülemine ninakäik (koljus)", "Верхний носовой ход (черепа)"], ["Meatus nasopharyngeus", "Ninaneelukäik", "Носоглоточный ход"], ["Meatus nasopharyngeus cranii", "Kolju ninaneelukäik", "Носоглоточный ход (черепа)"], ["Meatus superior nasi", "Ülemine ninakäik", "Верхний носовой ход"], ["Medulla oblongata", "Piklikaju", "Продолговатый мозг"], ["Medulla spinalis", "Seljaaju", "Спинной мозг"], ["Mesencephalon", "Keskaju", "Средний мозг"], ["Naris", "Sõõre (ninasõõre)", "Ноздря"], ["Nasus externus", "Välisnina", "Наружный нос"], ["Nuclei basales et structurae pertinentes", "Basaaltuumad ja seonduvad struktuurid", "Базальные ядра и относящиеся к ним структуры"], ["Nucleus lentiformis", "Läätstuum", "Чечевицеобразное ядро"], ["Occiput", "Kukal", "Затылок"], ["Occiput cranii", "Kolju kukal", "Затылок (черепа)"], ["Os ethmoideum", "Sõelluu", "Решётчатая кость"], ["Os frontale", "Otsmikuluu", "Лобная кость"], ["Os lacrimale", "Pisaraluu", "Слёзная кость"], ["Os occipitale", "Kuklaluu", "Затылочная кость"], ["Os parietale", "Kiiruluu", "Теменная кость"], ["Os sphenoideum", "Kiilluu", "Клиновидная кость"], ["Os zygomaticum", "Sarnaluu", "Скуловая кость"], ["Ostium pharyngeum tubae auditivae", "Kuulmetõri neelusuue", "Глоточное отверстие слуховой трубы"], ["Palatum durum", "Kõva suulagi", "Твёрдое нёбо"], ["Palatum molle", "Pehme suulagi", "Мягкое нёбо"], ["Palatum osseum", "Luuline suulagi", "Костное нёбо"], ["Palpebra inferior", "Alalaug", "Нижнее веко"], ["Palpebra superior", "Ülalaug", "Верхнее веко"], ["Paries inferior orbitae", "Silmakoopa alumine sein", "Нижняя стенка глазницы"], ["Paries lateralis orbitae", "Silmakoopa külgmine sein", "Латеральная стенка глазницы"], ["Paries medialis orbitae", "Silmakoopa keskmine sein", "Медиальная стенка глазницы"], ["Paries superior orbitae", "Silmakoopa ülemine sein", "Верхняя стенка глазницы"], ["Pars basilaris ossis occipitalis", "Kuklaluu põhimikuosa", "Базилярная часть затылочной кости"], ["Pars cavernosa arteriae carotidis internae", "Sisemise unearteri korgasosa", "Пещеристая часть внутренней сонной артерии"], ["Pars centralis ventriculi lateralis", "Külgvatsakese keskosa", "Центральная часть бокового желудочка"], ["Pars cerebralis arteriae carotidis internae", "Sisemise unearteri ajuosa", "Мозговая часть внутренней сонной артерии"], ["Pars cervicalis arteriae carotidis internae", "Sisemise unearteri kaelaosa", "Шейная часть внутренней сонной артерии"], ["Pars nasalis ossis frontalis", "Otsmikuluu ninaosa", "Носовая часть лобной кости"], ["Pars orbitalis ossis frontalis", "Otsmikuluu silmakoopaosa", "Глазничная часть лобной кости"], ["Pars ossea septi nasi", "Ninavaheseina luuline osa", "Костная часть перегородки носа"], ["Pars petrosa arteriae carotidis internae", "Sisemise unearteri kaljuosa", "Каменистая часть внутренней сонной артерии"], ["Pars petrosa ossis temporalis", "Oimuluu kaljuosa (püramiid)", "Каменистая часть височной кости (пирамида)"], ["Pars squamosa ossis temporalis", "Oimuluu soomusosa", "Чешуйчатая часть височной кости"], ["Pars tympanica ossis temporalis", "Oimuluu trummiosa", "Барабанная часть височной кости"], ["Pedunculi cerebellares", "Väikeajuvarred", "Мозжечковые ножки"], ["Pedunculus cerebri", "Suurajujalg", "Ножка мозга"], ["Pharynx", "Neel", "Глотка"], ["Plexus chorioideus ventriculi lateralis", "Külgvatsakese soonpõimik", "Сосудистое сплетение бокового желудочка"], ["Plexus chorioideus ventriculi tertii", "Kolmanda vatsakese soonpõimik", "Сосудистое сплетение третьего желудочка"], ["Pons", "Ajusild (pons)", "Мост (варолиев мост)"], ["Porus acusticus externus cranii", "Välimine kuulmeava", "Наружное слуховое отверстие"], ["Porus acusticus internus", "Sisemine kuulmeava", "Внутреннее слуховое отверстие"], ["Processus alveolaris maxillae", "Ülalõualuu sombujätke (alveolaarjätke)", "Альвеолярный отросток верхней челюсти"], ["Processus clinoideus anterior", "Eesmine kaldjätke", "Передний наклонённый отросток"], ["Processus clinoideus posterior", "Tagumine kaldjätke", "Задний наклонённый отросток"], ["Processus coronoideus mandibulae", "Alalõualuu pärgjätke", "Венечный отросток нижней челюсти"], ["Processus frontalis maxillae", "Ülalõualuu otsmikujätke", "Лобный отросток верхней челюсти"], ["Processus frontalis ossis zygomatici", "Sarnaluu otsmikujätke", "Лобный отросток скуловой кости"], ["Processus mastoideus", "Nibujätke", "Сосцевидный отросток"], ["Processus palatinus", "Suulaejätke", "Нёбный отросток"], ["Processus styloideus ossis temporalis", "Oimuluu tikkeljätke", "Шиловидный отросток височной кости"], ["Processus temporalis ossis zygomatici", "Sarnaluu oimujätke", "Височный отросток скуловой кости"], ["Processus transversus", "Ristijätke", "Поперечный отросток"], ["Processus zygomaticus maxillae", "Ülalõualuu sarnajätke", "Скуловой отросток верхней челюсти"], ["Processus zygomaticus ossis frontalis", "Otsmikuluu sarnajätke", "Скуловой отросток лобной кости"], ["Processus zygomaticus ossis temporalis", "Oimuluu sarnajätke", "Скуловой отросток височной кости"], ["Protuberantia occipitalis externa", "Välimine kuklamügar", "Наружный затылочный выступ"], ["Protuberantia occipitalis interna", "Sisemine kuklamügar", "Внутренний затылочный выступ"], ["Radiatio corporis callosi", "Mõhnkeha kiirgus", "Лучистость мозолистого тела"], ["Radix nasi", "Ninajuur", "Корень носа"], ["Ramus mandibulae", "Alalõuaharu", "Ветвь нижней челюсти"], ["Recessus pharyngeus", "Neelusopp", "Глоточный карман"], ["Recessus sphenoethmoideus", "Kiil-sõelluusopp", "Клиновидно-решётчатое углубление"], ["Recessus sphenoethmoideus cranii", "Kolju kiil-sõelluusopp", "Клиновидно-решётчатое углубление (черепа)"], ["Rima palpebrarum", "Silmalau pilu", "Щель век (глазная щель)"], ["Rostrum corporis callosi", "Mõhnkeha nokk", "Клюв мозолистого тела"], ["Rostrum sphenoideum", "Kiilluunokk", "Клиновидный клюв"], ["Sella turcica", "Türgi sadul", "Турецкое седло"], ["Septum nasi", "Ninavahesein", "Перегородка носа"], ["Septum pellucidum", "Läbipaistev vahesein", "Прозрачная перегородка"], ["Septum sinuum frontalium", "Otsmikusiinuste vahesein", "Перегородка лобных пазух"], ["Septum sinuum sphenoideorum", "Kiilluusiinuste vahesein", "Перегородка клиновидных пазух"], ["Sinciput", "Eespea (laup)", "Передняя часть головы (чело)"], ["Sinus cavernosus", "Korgassiinus", "Пещеристый синус"], ["Sinus frontalis", "Otsmikusiinus (otsmikuurk)", "Лобная пазуха"], ["Sinus maxillae", "Ülalõuasiinus (ülalõuaurk)", "Пазуха верхней челюсти"], ["Sinus maxillaris", "Ülalõuasiinus (ülalõuaurk)", "Верхнечелюстная пазуха (гайморова пазуха)"], ["Sinus occipitalis", "Kuklasiinus", "Затылочный синус"], ["Sinus ossis frontalis", "Otsmikuluu siinus (otsmikuurk)", "Пазуха лобной кости"], ["Sinus ossis sphenoidei", "Kiilluusiinus (kiilluu-urk)", "Пазуха клиновидной кости"], ["Sinus rectus", "Sirgsiinus", "Прямой синус"], ["Sinus sagittalis inferior", "Alumine sagitaalsiinus", "Нижний сагиттальный синус"], ["Sinus sagittalis superior", "Ülemine sagitaalsiinus", "Верхний сагиттальный синус"], ["Sinus sigmoideus", "Sigmasiinus", "Сигмовидный синус"], ["Sinus sphenoideus", "Kiilluusiinus (kiilluu-urk)", "Клиновидная пазуха"], ["Sinus transversus", "Ristsiinus", "Поперечный синус"], ["Spina nasalis anterior", "Eesmine ninaoga", "Передняя носовая ость"], ["Spina nasalis ossis frontalis", "Otsmikuluu ninaoga", "Носовая ость лобной кости"], ["Spina nasalis posterior", "Tagumine ninaoga", "Задняя носовая ость"], ["Spina ossis sphenoidei", "Kiilluuoga", "Ость клиновидной кости"], ["Splenium corporis callosi", "Mõhnkeha paksend", "Валик мозолистого тела"], ["Squama frontalis", "Otsmikuluu soomus", "Лобная чешуя"], ["Squama occipitalis", "Kuklaluu soomus", "Затылочная чешуя"], ["Stoma", "Suu (suuava)", "Рот (ротовое отверстие)"], ["Sulci venosi", "Veenivaod", "Венозные борозды"], ["Sulcus arteriae vertebralis", "Selgrooarteri vagu", "Борозда позвоночной артерии"], ["Sulcus carotidis", "Unearterivagu", "Сонная борозда"], ["Sulcus lacrimalis", "Pisaravagu", "Слёзная борозда"], ["Sulcus palatinus major maxillae", "Ülalõualuu suur suulaevagu", "Большая нёбная борозда верхней челюсти"], ["Sulcus sinus sagittalis superioris", "Ülemise sagitaalsiinuse vagu", "Борозда верхнего сагиттального синуса"], ["Sulcus tubae auditivae", "Kuulmetõri vagu", "Борозда слуховой трубы"], ["Tegmen tympani", "Trummiõõne katus (trummikatus)", "Крыша барабанной полости"], ["Tela chorioidea ventriculi quarti", "Neljanda vatsakese soonkile", "Сосудистая основа четвёртого желудочка"], ["Tempus", "Oim (meelekoht)", "Висок"], ["Tentorium cerebelli", "Väikeajutelk", "Намёт мозжечка"], ["Thalamus", "Talamus", "Таламус (зрительный бугор)"], ["Tonsilla cerebelli [H IX]", "Väikeajumandel [H IX]", "Миндалина мозжечка [Н IX]"], ["Torus tubarius", "Kuulmetõri paksend", "Трубный валик"], ["Tractus opticus", "Nägemistrakt", "Зрительный тракт"], ["Truncus corporis callosi", "Mõhnkeha tüvi", "Ствол мозолистого тела"], ["Truncus encephali", "Ajutüvi", "Ствол головного мозга"], ["Tuber maxillae", "Ülalõuamügar", "Бугор верхней челюсти"], ["Tuberculum articulare", "Liigesekühmuke", "Суставной бугорок"], ["Tuberculum jugulare", "Kägikühmuke", "Яремный бугорок"], ["Vagina processus styloidei", "Tikkeljätketupp", "Влагалище шиловидного отростка"], ["Vena anastomotica inferior", "Alumine anastomoosveen (Labbé veen)", "Нижняя анастомотическая вена (вена Лаббе)"], ["Vena anastomotica superior", "Ülemine anastomoosveen (Trolardi veen)", "Верхняя анастомотическая вена (вена Тролара)"], ["Vena basalis", "Põhimikuveen (Rosenthali veen)", "Базальная вена (вена Розенталя)"], ["Vena interna cerebri", "Sisemine ajuveen", "Внутренняя мозговая вена"], ["Vena jugularis interna", "Sisemine kägiveen", "Внутренняя яремная вена"], ["Vena magna cerebri", "Suur ajuveen (Galenose veen)", "Большая мозговая вена (вена Галена)"], ["Vena media superficialis cerebri", "Pindmine keskmine ajuveen", "Поверхностная средняя мозговая вена"], ["Vena thalamostriata superior", "Ülemine talamostriaalveen", "Верхняя таламостриарная вена"], ["Ventriculi cerebri", "Ajuvatsakesed", "Желудочки головного мозга"], ["Ventriculus lateralis", "Külgvatsake", "Боковой желудочек"], ["Ventriculus quartus", "Neljas vatsake", "Четвёртый желудочек"], ["Ventriculus tertius", "Kolmas vatsake", "Третий желудочек"], ["Vermis cerebelli", "Väikeajuuss", "Червь мозжечка"], ["Vertex", "Pealagi", "Темя (макушка)"], ["Vestibulum nasi", "Ninaesik", "Преддверие носа"], ["Vomer", "Sahkluu", "Сошник"]];
+        const RAW_GLOSSARY_DATA = [["Adhaesio interthalamica", "Talamustevaheline liide", "Межталамическое сращение"], ["Ala major", "Suur tiib (kiilluu suur tiib)", "Большое крыло (клиновидной кости)"], ["Ala minor", "Väike tiib (kiilluu väike tiib)", "Малое крыло (клиновидной кости)"], ["Ala nasi", "Ninatiib", "Крыло носа"], ["Angulus pontocerebellaris", "Silla-väikeaju nurk", "Мостомозжечковый угол"], ["Anulus tympanicus", "Trummivõru", "Барабанное кольцо"], ["Apertura ductus nasolacrimalis", "Nina-pisarajuha avaus", "Апертура носослёзного протока"], ["Apertura externa canalis carotidis", "Unearterikanali välimine avaus", "Наружная апертура сонного канала"], ["Apertura interna canalis carotidis", "Unearterikanali sisemine avaus", "Внутренняя апертура сонного канала"], ["Apertura lateralis ventriculi quarti", "Neljanda vatsakese külgmine avaus (Luschka ava)", "Латеральная апертура четвёртого желудочка"], ["Apertura mediana ventriculi quarti", "Neljanda vatsakese keskmine avaus (Magendie ava)", "Срединная апертура четвёртого желудочка"], ["Apertura sinus frontalis", "Otsmikusiinuse avaus", "Апертура лобной пазухи"], ["Apertura sinus ossis sphenoidei", "Kiilluusiinuse avaus", "Апертура клиновидной пазухи"], ["Apex partis petrosae", "Kaljuosa tipp", "Верхушка каменистой части"], ["Aquaeductus mesencephali", "Keskaju veejuha", "Водопровод среднего мозга"], ["Arcus anterior atlantis", "Kandelüli eesmine kaar", "Передняя дуга атланта"], ["Arcus posterior atlantis", "Kandelüli tagumine kaar", "Задняя дуга атланта"], ["Arcus superciliaris", "Kulmukaar", "Надбровная дуга"], ["Arcus zygomaticus", "Sarnakaar", "Скуловая дуга"], ["Arteria basilaris", "Basilaararter (põhimikuarter)", "Базилярная артерия"], ["Arteria cerebri anterior: Pars postcommunicalis; Segmentum A2 [A2]", "Eesmine ajuarter: ühendusejärgne osa (A2-segment)", "Передняя мозговая артерия: посткоммуникационная часть (сегмент А2)"], ["Arteria cerebri anterior: Pars precommunicalis; Segmentum A1 [A1]", "Eesmine ajuarter: ühenduseelne osa (A1-segment)", "Передняя мозговая артерия: предкоммуникационная часть (сегмент А1)"], ["Arteria cerebri media: Pars insularis; Segmentum M2 [M2]", "Keskmine ajuarter: saareosa (M2-segment)", "Средняя мозговая артерия: островковая часть (сегмент M2)"], ["Arteria cerebri media: Pars sphenoidalis; Pars horizontalis; Segmentum M1 [M1]", "Keskmine ajuarter: kiilluuosa / horisontaalosa (M1-segment)", "Средняя мозговая артерия: клиновидная / горизонтальная часть (сегмент М1)"], ["Arteria cerebri posterior: Pars postcommunicalis; Segmentum P2 [P2]", "Tagumine ajuarter: ühendusejärgne osa (P2-segment)", "Задняя мозговая артерия: посткоммуникационная часть (сегмент Р2)"], ["Arteria cerebri posterior: Pars precommunicalis; Segmentum P1 [P1]", "Tagumine ajuarter: ühenduseelne osa (P1-segment)", "Задняя мозговая артерия: предкоммуникационная часть (сегмент Р1)"], ["Arteria communicans anterior", "Eesmine ühendusarter", "Передняя соединительная артерия"], ["Arteria communicans posterior", "Tagumine ühendusarter", "Задняя соединительная артерия"], ["Arteria inferior posterior cerebelli", "Väikeaju alumine tagumine arter", "Задняя нижняя мозжечковая артерия"], ["Arteria superior cerebelli", "Väikeaju ülemine arter", "Верхняя мозжечковая артерия"], ["Arteria vertebralis: Segmentum extraduralis; Segmentum atlanticum (V3) [V3]", "Selgrooarter: kõvakestaväline / kandelüliosa (V3-segment)", "Позвоночная артерия: экстрадуральный / атлантовый сегмент (V3)"], ["Arteria vertebralis: Segmentum foraminalis (V2) [V2]", "Selgrooarter: ristijätkemulkude osa (V2-segment)", "Позвоночная артерия: фораминальный сегмент (V2)"], ["Arteria vertebralis: Segmentum intraduralis; Segmentum intracranialis (V4) [V4]", "Selgrooarter: kõvakestasisene / koljusisene osa (V4-segment)", "Позвоночная артерия: интрадуральный / внутричерепной сегмент (V4)"], ["Articulatio atlantoaxialis mediana", "Keskmine kande-telglüliliiges", "Срединный атлантоосевой сустав"], ["Articulatio atlantooccipitalis", "Kandelüli-kuklaluuliiges", "Атлантозатылочный сустав"], ["Articulatio temporomandibularis", "Alalõualiiges", "Височно-нижнечелюстной сустав"], ["Atlas", "Kandelüli (atlas)", "Атлант (первый шейный позвонок)"], ["Atrium meatus medii", "Keskmise ninakäigu esik (aatrium)", "Преддверие среднего носового хода"], ["Atrium ventriculi lateralis", "Külgvatsakese kolmnurk (aatrium)", "Преддверие (треугольник) бокового желудочка"], ["Auris", "Kõrv", "Ухо"], ["Axis", "Telglüli (aksis)", "Осевой позвонок (аксис)"], ["Basis cranii", "Koljupõhimik", "Основание черепа"], ["Bucca", "Põsk", "Щека"], ["Bulla ethmoidea", "Sõelluupõis", "Решётчатый пузырёк"], ["Bulla ethmoidea ossea", "Luuline sõelluupõis", "Костный решётчатый пузырёк"], ["Calcar avis", "Kukekannus", "Птичья шпора"], ["Calvaria", "Koljuvõlv", "Свод черепа"], ["Canales diploici", "Diploekanalid", "Диплоические каналы"], ["Canales incisivi", "Lõikehambakanalid", "Резцовые каналы"], ["Canalis carotidis", "Unearterikanal", "Сонный канал"], ["Canalis condylaris", "Põndakanal", "Мыщелковый канал"], ["Canalis facialis", "Näonärvikanal", "Лицевой канал"], ["Canalis hypoglossus", "Keelealuse närvi kanal", "Подъязычный канал"], ["Canalis infraorbitalis", "Silmakoopaalune kanal", "Подглазничный канал"], ["Canalis mandibulae", "Alalõuakanal", "Канал нижней челюсти"], ["Canalis musculotubarius", "Lihase-kuulmetõri kanal", "Мышечно-трубный канал"], ["Canalis nasolacrimalis", "Nina-pisarakanal", "Носослёзный канал"], ["Canalis opticus", "Nägemisnärvikanal", "Зрительный канал"], ["Canalis palatinus major", "Suur suulaekanal", "Большой нёбный канал"], ["Canalis pterygoideus", "Tiibjätkekanal", "Крыловидный канал"], ["Capsula interna", "Sisemine kihn", "Внутренняя капсула"], ["Caput", "Pea", "Голова"], ["Caput nuclei caudati", "Sabatuuma pea", "Головка хвостатого ядра"], ["Cauda nuclei caudati", "Sabatuuma saba", "Хвост хвостатого ядра"], ["Cavitas cranii", "Koljuõõs", "Полость черепа"], ["Cavitas orbitae", "Silmakoobas", "Глазница (полость глазницы)"], ["Cavitas oris", "Suuõõs", "Полость рта"], ["Cavitas tympani cranii", "Trummiõõs", "Барабанная полость"], ["Cavum trigeminale", "Kolmiknärviõõs", "Тройничная полость"], ["Cellulae ethmoideae anteriores", "Eesmised sõelluurakud", "Передние решётчатые ячейки"], ["Cellulae ethmoideae mediae", "Keskmised sõelluurakud", "Средние решётчатые ячейки"], ["Cellulae ethmoideae posteriores", "Tagumised sõelluurakud", "Задние решётчатые ячейки"], ["Cerebellum", "Väikeaju", "Мозжечок"], ["Chiasma opticum", "Nägemisristmik", "Зрительный перекрёст"], ["Choana", "Tagasõõre (koaan)", "Хоана"], ["Choana cranii", "Kolju tagasõõre (koaan)", "Хоана черепа"], ["Circulus arteriosus cerebri", "Suuraju arteriaalring (Willise ring)", "Артериальный круг большого мозга"], ["Clivus", "Nõlv (kliivus)", "Скат"], ["Collum", "Kael", "Шея"], ["Collum mandibulae", "Alalõuakael", "Шейка нижней челюсти"], ["Commissura anterior", "Eesmine komissuur", "Передняя спайка"], ["Commissura posterior", "Tagumine komissuur", "Задняя спайка"], ["Concha inferior nasi", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha media nasi", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis inferior", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha nasalis media", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis superior", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Concha superior nasi", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Condylus mandibulae", "Alalõuapõnt (alalõuapea)", "Мыщелок (головка) нижней челюсти"], ["Condylus occipitalis", "Kuklapõnt", "Затылочный мыщелок"], ["Confluens sinuum", "Siinuste ühinemiskoht", "Сток синусов"], ["Cornu frontale", "Otsmikusarv (eesmine sarv)", "Лобный (передний) рог"], ["Cornu occipitale", "Kuklasarv (tagumine sarv)", "Затылочный (задний) рог"], ["Cornu temporale", "Oimusarv (alumine sarv)", "Височный (нижний) рог"], ["Corona radiata", "Kiirtepärg", "Лучистый венец"], ["Corpus adiposum buccae", "Põse rasvkeha", "Жировое тело щеки"], ["Corpus nuclei caudati", "Sabatuuma keha", "Тело хвостатого ядра"], ["Corpus ossis sphenoidei", "Kiilluu keha", "Тело клиновидной кости"], ["Cranium", "Kolju", "Череп"], ["Crista frontalis", "Otsmikuhari", "Лобный гребень"], ["Crista galli", "Kukehari", "Петушиный гребень"], ["Crista lacrimalis posterior", "Tagumine pisarahari", "Задний слёзный гребень"], ["Crista nasalis maxillae", "Ülalõualuu ninahari", "Носовой гребень верхней челюсти"], ["Crista nasalis ossis palatini", "Suulaeluu ninahari", "Носовой гребень нёбной кости"], ["Crista occipitalis externa", "Välimine kuklahari", "Наружный затылочный гребень"], ["Crista occipitalis interna", "Sisemine kuklahari", "Внутренний затылочный гребень"], ["Crista sphenoidea", "Kiilluuhari", "Клиновидный гребень"], ["Dens axis", "Telglüli hammas", "Зуб осевого позвонка"], ["Dentes", "Hambad", "Зубы"], ["Diaphragma sellae", "Sadulavahelihas (saduladiafragma)", "Диафрагма седла"], ["Diencephalon", "Vaheaju", "Промежуточный мозг"], ["Diploe", "Diploe", "Диплоэ"], ["Dorsum nasi", "Ninaselg", "Спинка носа"], ["Dorsum sellae", "Sadulaselg", "Спинка седла"], ["Encephalon", "Peaaju", "Головной мозг"], ["Facies", "Nägu", "Лицо"], ["Facies anterior maxillae", "Ülalõualuu eesmine pind", "Передняя поверхность верхней челюсти"], ["Facies articularis superior atlantis", "Kandelüli ülemine liigesepind", "Верхняя суставная поверхность атланта"], ["Facies infratemporalis maxillae", "Ülalõualuu oimualune pind", "Подвисочная поверхность верхней челюсти"], ["Facies nasalis maxillae", "Ülalõualuu ninapind", "Носовая поверхность верхней челюсти"], ["Facies orbitalis maxillae", "Ülalõualuu silmakoopapind", "Глазничная поверхность верхней челюсти"], ["Falx cerebelli", "Väikeajusirp", "Серп мозжечка"], ["Falx cerebri", "Suurajusirp", "Серп большого мозга"], ["Fissura chorioidea", "Soonpõimikulõhe", "Сосудистая щель"], ["Fissura orbitalis inferior", "Alumine silmakoopalõhe", "Нижняя глазничная щель"], ["Fissura orbitalis superior", "Ülemine silmakoopalõhe", "Верхняя глазничная щель"], ["Flocculus [H X]", "Flokulus (väikeajututt) [H X]", "Клочок мозжечка [Н Х]"], ["Foramen alveolare inferius", "Alalõuamulk", "Нижнее альвеолярное отверстие (отверстие нижней челюсти)"], ["Foramen caecum ossis frontalis", "Otsmikuluu umbmulk", "Слепое отверстие лобной кости"], ["Foramen infraorbitale", "Silmakoopaalune mulk", "Подглазничное отверстие"], ["Foramen interventriculare", "Vatsakestevaheline mulk", "Межжелудочковое отверстие"], ["Foramen jugulare", "Kägimulk", "Яремное отверстие"], ["Foramen lacerum", "Rebimulk", "Рваное отверстие"], ["Foramen magnum", "Suur kuklamulk", "Большое (затылочное) отверстие"], ["Foramen mastoideum", "Nibujätkemulk", "Сосцевидное отверстие"], ["Foramen ovale", "Ovaalmulk", "Овальное отверстие"], ["Foramen palatinum majus", "Suur suulaemulk", "Большое нёбное отверстие"], ["Foramen parietale", "Kiiruluumulk", "Теменное отверстие"], ["Foramen rotundum", "Ümarmulk", "Круглое отверстие"], ["Foramen sphenopalatinum", "Kiilluu-suulaemulk", "Клиновидно-нёбное отверстие"], ["Foramen spinosum", "Ogamulk", "Остистое отверстие"], ["Foramen stylomastoideum", "Tikkel-nibujätkemulk", "Шилососцевидное отверстие"], ["Foramen transversarium", "Ristijätkemulk", "Поперечное отверстие"], ["Fornix", "Ajukaar (võlv)", "Свод"], ["Fossa anterior cranii", "Eesmine koljuauk", "Передняя черепная ямка"], ["Fossa condylaris", "Põndaauk", "Мыщелковая ямка"], ["Fossa incisiva", "Lõikehambaauk", "Резцовая ямка"], ["Fossa jugularis", "Kägiauk", "Яремная ямка"], ["Fossa mandibularis", "Alalõuaauk", "Нижнечелюстная ямка"], ["Fossa media cranii", "Keskmine koljuauk", "Средняя черепная ямка"], ["Fossa posterior cranii", "Tagumine koljuauk", "Задняя черепная ямка"], ["Fossa pterygoidea", "Tiibjätkeauk", "Крыловидная ямка"], ["Fossa scaphoidea", "Lootsikauk (paatjas auk)", "Ладьевидная ямка"], ["Fossula petrosa", "Kaljulohuke", "Каменистая ямочка"], ["Fovea pterygoidea", "Tiibjätkelohk", "Крыловидная ямка (нижней челюсти)"], ["Foveolae granulares", "Granulatsioonilohukesed", "Ямочки грануляций"], ["Frons cranii", "Otsmik (laup)", "Лоб"], ["Genu corporis callosi", "Mõhnkeha põlv", "Колено мозолистого тела"], ["Gingiva", "Ige", "Десна"], ["Glabella", "Kulmudevahe (glabella)", "Глабелла (надпереносье)"], ["Glandula parotidea", "Kõrvasüljenääre", "Околоушная слюнная железа"], ["Glandula pinealis", "Käbikeha (epifüüs)", "Шишковидное тело (эпифиз)"], ["Granulationes arachnoideae", "Ämblikuvõrkkesta granulatsioonid", "Грануляции паутинной оболочки"], ["Hamulus pterygoideus", "Tiibjätkekonks", "Крыловидный крючок"], ["Hemisphaerium cerebelli", "Väikeaju poolkera", "Полушарие мозжечка"], ["Hemisphaerium cerebri", "Suuraju poolkera", "Полушарие большого мозга"], ["Hiatus maxillae", "Ülalõuaurkehaigutus", "Расщелина верхнечелюстной пазухи"], ["Hypophysis", "Ajuripats (hüpofüüs)", "Гипофиз"], ["Hypothalamus", "Hüpotalamus", "Гипоталамус"], ["Incisura jugularis ossis occipitalis", "Kuklaluu kägisälk", "Яремная вырезка затылочной кости"], ["Incisura jugularis ossis temporalis", "Oimuluu kägisälk", "Яремная вырезка височной кости"], ["Incisura mandibulae", "Alalõuasälk", "Вырезка нижней челюсти"], ["Incisura mastoidea", "Nibujätkesälk", "Сосцевидная вырезка"], ["Incisura pterygoidea", "Tiibjätkesälk", "Крыловидная вырезка"], ["Incisura supraorbitalis", "Silmakoopaülene sälk", "Надглазничная вырезка"], ["Incisura tentorii", "Väikeajutelgi sälk", "Вырезка намёта мозжечка"], ["Infundibulum ethmoideum", "Sõelluulehter", "Решётчатая воронка"], ["Infundibulum ethmoideum osseum", "Luuline sõelluulehter", "Костная решётчатая воронка"], ["Insula", "Saar (Reili saar)", "Островок (островковая доля)"], ["Jugum sphenoideum", "Kiilluuike", "Клиновидное возвышение"], ["Labium superius oris", "Ülahuul", "Верхняя губа"], ["Labyrinthus ethmoideus", "Sõelluulabürint", "Решётчатый лабиринт"], ["Lamina cribrosa", "Sõellest", "Решётчатая пластинка"], ["Lamina horizontalis ossis palatini", "Suulaeluu rõhtlest", "Горизонтальная пластинка нёбной кости"], ["Lamina lateralis processus pterygoidei", "Tiibjätke külgmine lest", "Латеральная пластинка крыловидного отростка"], ["Lamina medialis processus pterygoidei", "Tiibjätke keskmine lest", "Медиальная пластинка крыловидного отростка"], ["Lamina orbitalis labyrinthi ethmoidei", "Sõelluulabürindi silmakoopalest", "Глазничная пластинка решётчатого лабиринта"], ["Lamina perpendicularis ossis ethmoidei", "Sõelluu püstlest", "Перпендикулярная пластинка решётчатой кости"], ["Lamina perpendicularis ossis palatini", "Suulaeluu püstlest", "Перпендикулярная пластинка нёбной кости"], ["Lingua", "Keel", "Язык"], ["Lobus anterior cerebelli", "Väikeaju eesmine sagar", "Передняя доля мозжечка"], ["Lobus frontalis", "Otsmikusagar", "Лобная доля"], ["Lobus occipitalis", "Kuklasagar", "Затылочная доля"], ["Lobus parietalis", "Kiirusagar", "Теменная доля"], ["Lobus posterior cerebelli", "Väikeaju tagumine sagar", "Задняя доля мозжечка"], ["Lobus temporalis", "Oimusagar", "Височная доля"], ["Margo infraorbitalis", "Silmakoopa alumine serv", "Подглазничный край"], ["Margo lateralis orbitae", "Silmakoopa külgmine serv", "Латеральный край глазницы"], ["Margo medialis orbitae", "Silmakoopa keskmine serv", "Медиальный край глазницы"], ["Margo supraorbitalis", "Silmakoopa ülemine serv", "Надглазничный край"], ["Massa lateralis atlantis", "Kandelüli külgmass", "Латеральная масса атланта"], ["Maxilla", "Ülalõualuu", "Верхняя челюсть"], ["Meatus acusticus externus cranii", "Välimine kuulmekäik", "Наружный слуховой проход"], ["Meatus acusticus internus", "Sisemine kuulmekäik", "Внутренний слуховой проход"], ["Meatus communis nasi", "Ühine ninakäik", "Общий носовой ход"], ["Meatus inferior nasi", "Alumine ninakäik", "Нижний носовой ход"], ["Meatus medius nasi", "Keskmine ninakäik", "Средний носовой ход"], ["Meatus nasalis communis cranii", "Ühine ninakäik (koljus)", "Общий носовой ход (черепа)"], ["Meatus nasalis inferior cranii", "Alumine ninakäik (koljus)", "Нижний носовой ход (черепа)"], ["Meatus nasalis medius cranii", "Keskmine ninakäik (koljus)", "Средний носовой ход (черепа)"], ["Meatus nasalis superior cranii", "Ülemine ninakäik (koljus)", "Верхний носовой ход (черепа)"], ["Meatus nasopharyngeus", "Ninaneelukäik", "Носоглоточный ход"], ["Meatus nasopharyngeus cranii", "Kolju ninaneelukäik", "Носоглоточный ход (черепа)"], ["Meatus superior nasi", "Ülemine ninakäik", "Верхний носовой ход"], ["Medulla oblongata", "Piklikaju", "Продолговатый мозг"], ["Medulla spinalis", "Seljaaju", "Спинной мозг"], ["Mesencephalon", "Keskaju", "Средний мозг"], ["Naris", "Sõõre (ninasõõre)", "Ноздря"], ["Nasus externus", "Välisnina", "Наружный нос"], ["Nuclei basales et structurae pertinentes", "Basaaltuumad ja seonduvad struktuurid", "Базальные ядра и относящиеся к ним структуры"], ["Nucleus lentiformis", "Läätstuum", "Чечевицеобразное ядро"], ["Occiput", "Kukal", "Затылок"], ["Occiput cranii", "Kolju kukal", "Затылок (черепа)"], ["Os ethmoideum", "Sõelluu", "Решётчатая кость"], ["Os frontale", "Otsmikuluu", "Лобная кость"], ["Os lacrimale", "Pisaraluu", "Слёзная кость"], ["Os occipitale", "Kuklaluu", "Затылочная кость"], ["Os parietale", "Kiiruluu", "Теменная кость"], ["Os sphenoideum", "Kiilluu", "Клиновидная кость"], ["Os zygomaticum", "Sarnaluu", "Скуловая кость"], ["Ostium pharyngeum tubae auditivae", "Kuulmetõri neelusuue", "Глоточное отверстие слуховой трубы"], ["Palatum durum", "Kõva suulagi", "Твёрдое нёбо"], ["Palatum molle", "Pehme suulagi", "Мягкое нёбо"], ["Palatum osseum", "Luuline suulagi", "Костное нёбо"], ["Palpebra inferior", "Alalaug", "Нижнее веко"], ["Palpebra superior", "Ülalaug", "Верхнее веко"], ["Paries inferior orbitae", "Silmakoopa alumine sein", "Нижняя стенка глазницы"], ["Paries lateralis orbitae", "Silmakoopa külgmine sein", "Латеральная стенка глазницы"], ["Paries medialis orbitae", "Silmakoopa keskmine sein", "Медиальный стенка глазницы"], ["Paries superior orbitae", "Silmakoopa ülemine sein", "Верхняя стенка глазницы"], ["Pars basilaris ossis occipitalis", "Kuklaluu põhimikuosa", "Базилярная часть затылочной кости"], ["Pars cavernosa arteriae carotidis internae", "Sisemise unearteri korgasosa", "Пещеристая часть внутренней сонной артерии"], ["Pars centralis ventriculi lateralis", "Külgvatsakese keskosa", "Центральная часть бокового желудочка"], ["Pars cerebralis arteriae carotidis internae", "Sisemise unearteri ajuosa", "Мозговая часть внутренней сонной артерии"], ["Pars cervicalis arteriae carotidis internae", "Sisemise unearteri kaelaosa", "Шейная часть внутренней сонной артерии"], ["Pars nasalis ossis frontalis", "Otsmikuluu ninaosa", "Носовая часть лобной кости"], ["Pars orbitalis ossis frontalis", "Otsmikuluu silmakoopaosa", "Глазничная часть лобной кости"], ["Pars ossea septi nasi", "Ninavaheseina luuline osa", "Костная часть перегородки носа"], ["Pars petrosa arteriae carotidis internae", "Sisemise unearteri kaljuosa", "Каменистая часть внутренней сонной артерии"], ["Pars petrosa ossis temporalis", "Oimuluu kaljuosa (püramiid)", "Каменистая часть височной кости (пирамида)"], ["Pars squamosa ossis temporalis", "Oimuluu soomusosa", "Чешуйчатая часть височной кости"], ["Pars tympanica ossis temporalis", "Oimuluu trummiosa", "Барабанная часть височной кости"], ["Pedunculi cerebellares", "Väikeajuvarred", "Мозжечковые ножки"], ["Pedunculus cerebri", "Suurajujalg", "Ножка мозга"], ["Pharynx", "Neel", "Глотка"], ["Plexus chorioideus ventriculi lateralis", "Külgvatsakese soonpõimik", "Сосудистое сплетение бокового желудочка"], ["Plexus chorioideus ventriculi tertii", "Kolmanda vatsakese soonpõimik", "Сосудистое сплетение третьего желудочка"], ["Pons", "Ajusild (pons)", "Мост (варолиев мост)"], ["Porus acusticus externus cranii", "Välimine kuulmeava", "Наружное слуховое отверстие"], ["Porus acusticus internus", "Sisemine kuulmeava", "Внутреннее слуховое отверстие"], ["Processus alveolaris maxillae", "Ülalõualuu sombujätke (alveolaarjätke)", "Альвеолярный отросток верхней челюсти"], ["Processus clinoideus anterior", "Eesmine kaldjätke", "Передний наклонённый отросток"], ["Processus clinoideus posterior", "Tagumine kaldjätke", "Задний наклонённый отросток"], ["Processus coronoideus mandibulae", "Alalõualuu pärgjätke", "Венечный отросток нижней челюсти"], ["Processus frontalis maxillae", "Ülalõualuu otsmikujätke", "Лобный отросток верхней челюсти"], ["Processus frontalis ossis zygomatici", "Sarnaluu otsmikujätke", "Лобный отросток скуловой кости"], ["Processus mastoideus", "Nibujätke", "Сосцевидный отросток"], ["Processus palatinus", "Suulaejätke", "Нёбный отросток"], ["Processus styloideus ossis temporalis", "Oimuluu tikkeljätke", "Шиловидный отросток височной кости"], ["Processus temporalis ossis zygomatici", "Sarnaluu oimujätke", "Височный отросток скуловой кости"], ["Processus transversus", "Ristijätke", "Поперечный отросток"], ["Processus zygomaticus maxillae", "Ülalõualuu sarnajätke", "Скуловой отросток верхней челюсти"], ["Processus zygomaticus ossis frontalis", "Otsmikuluu sarnajätke", "Скуловой отросток лобной кости"], ["Processus zygomaticus ossis temporalis", "Oimuluu sarnajätke", "Скуловой отросток височной кости"], ["Protuberantia occipitalis externa", "Välimine kuklamügar", "Наружный затылочный выступ"], ["Protuberantia occipitalis interna", "Sisemine kuklamügar", "Внутренний затылочный выступ"], ["Radiatio corporis callosi", "Mõhnkeha kiirgus", "Лучистость мозолистого тела"], ["Radix nasi", "Ninajuur", "Корень носа"], ["Ramus mandibulae", "Alalõuaharu", "Ветвь нижней челюсти"], ["Recessus pharyngeus", "Neelusopp", "Глоточный карман"], ["Recessus sphenoethmoideus", "Kiil-sõelluusopp", "Клиновидно-решётчатое углубление"], ["Recessus sphenoethmoideus cranii", "Kolju kiil-sõelluusopp", "Клиновидно-решётчатое углубление (черепа)"], ["Rima palpebrarum", "Silmalau pilu", "Щель век (глазная щель)"], ["Rostrum corporis callosi", "Mõhnkeha nokk", "Клюв мозолистого тела"], ["Rostrum sphenoideum", "Kiilluunokk", "Клиновидный клюв"], ["Sella turcica", "Türgi sadul", "Турецкое седло"], ["Septum nasi", "Ninavahesein", "Перегородка носа"], ["Septum pellucidum", "Läbipaistev vahesein", "Прозрачная перегородка"], ["Septum sinuum frontalium", "Otsmikusiinuste vahesein", "Перегородка лобных пазух"], ["Septum sinuum sphenoideorum", "Kiilluusiinuste vahesein", "Перегородка клиновидных пазух"], ["Sinciput", "Eespea (laup)", "Передняя часть головы (чело)"], ["Sinus cavernosus", "Korgassiinus", "Пещеристый синус"], ["Sinus frontalis", "Otsmikusiinus (otsmikuurk)", "Лобная пазуха"], ["Sinus maxillae", "Ülalõuasiinus (ülalõuaurk)", "Пазуха верхней челюсти"], ["Sinus maxillaris", "Ülalõuasiinus (ülalõuaurk)", "Верхнечелюстная пазуха (гайморова пазуха)"], ["Sinus occipitalis", "Kuklasiinus", "Затылочный синус"], ["Sinus ossis frontalis", "Otsmikuluu siinus (otsmikuurk)", "Пазуха лобной кости"], ["Sinus ossis sphenoidei", "Kiilluusiinus (kiilluu-urk)", "Пазуха клиновидной кости"], ["Sinus rectus", "Sirgsiinus", "Прямой синус"], ["Sinus sagittalis inferior", "Alumine sagitaalsiinus", "Нижний сагиттальный синус"], ["Sinus sagittalis superior", "Ülemine sagitaalsiinus", "Верхний сагиттальный синус"], ["Sinus sigmoideus", "Sigmasiinus", "Сигмовидный синус"], ["Sinus sphenoideus", "Kiilluusiinus (kiilluu-urk)", "Клиновидная пазуха"], ["Sinus transversus", "Ristsiinus", "Поперечный синус"], ["Spina nasalis anterior", "Eesmine ninaoga", "Передняя носовая ость"], ["Spina nasalis ossis frontalis", "Otsmikuluu ninaoga", "Носовая ость лобной кости"], ["Spina nasalis posterior", "Tagumine ninaoga", "Задняя носовая ость"], ["Spina ossis sphenoidei", "Kiilluuoga", "Ость клиновидной кости"], ["Splenium corporis callosi", "Mõhnkeha paksend", "Валик мозолистого тела"], ["Squama frontalis", "Otsmikuluu soomus", "Лобная чешуя"], ["Squama occipitalis", "Kuklaluu soomus", "Затылочная чешуя"], ["Stoma", "Suu (suuava)", "Рот (ротовое отверстие)"], ["Sulci venosi", "Veenivaod", "Венозные борозды"], ["Sulcus arteriae vertebralis", "Selgrooarteri vagu", "Борозда позвоночной артерии"], ["Sulcus carotidis", "Unearterivagu", "Сонная борозда"], ["Sulcus lacrimalis", "Pisaravagu", "Слёзная борозда"], ["Sulcus palatinus major maxillae", "Ülalõualuu suur suulaevagu", "Большая нёбная борозда верхней челюсти"], ["Sulcus sinus sagittalis superioris", "Ülemise sagitaalsiinuse vagu", "Борозда верхнего сагиттального синуса"], ["Sulcus tubae auditivae", "Kuulmetõri vagu", "Борозда слуховой трубы"], ["Tegmen tympani", "Trummiõõne katus (trummikatus)", "Крыша барабанной полости"], ["Tela chorioidea ventriculi quarti", "Neljanda vatsakese soonkile", "Сосудистая основа четвёртого желудочка"], ["Tempus", "Oim (meelekoht)", "Висок"], ["Tentorium cerebelli", "Väikeajutelk", "Намёт мозжечка"], ["Thalamus", "Talamus", "Таламус (зрительный бугор)"], ["Tonsilla cerebelli [H IX]", "Väikeajumandel [H IX]", "Миндалина мозжечка [Н IX]"], ["Torus tubarius", "Kuulmetõri paksend", "Трубный валик"], ["Tractus opticus", "Nägemistrakt", "Зрительный тракт"], ["Truncus corporis callosi", "Mõhnkeha tüvi", "Ствол мозолистого тела"], ["Truncus encephali", "Ajutüvi", "Ствол головного мозга"], ["Tuber maxillae", "Ülalõuamügar", "Бугор верхней челюсти"], ["Tuberculum articulare", "Liigesekühmuke", "Суставной бугорок"], ["Tuberculum jugulare", "Kägikühmuke", "Яремный бугорок"], ["Vagina processus styloidei", "Tikkeljätketupp", "Влагалище шиловидного отростка"], ["Vena anastomotica inferior", "Alumine anastomoosveen (Labbé veen)", "Нижняя анастомотическая вена (вена Лаббе)"], ["Vena anastomotica superior", "Ülemine anastomoosveen (Trolardi veen)", "Верхняя анастомотическая вена (вена Тролара)"], ["Vena basalis", "Põhimikuveen (Rosenthali veen)", "Базальная вена (вена Розенталя)"], ["Vena interna cerebri", "Sisemine ajuveen", "Внутренняя мозговая вена"], ["Vena jugularis interna", "Sisemine kägiveen", "Внутренняя яремная вена"], ["Vena magna cerebri", "Suur ajuveen (Galenose veen)", "Большая мозговая вена (вена Галена)"], ["Vena media superficialis cerebri", "Pindmine keskmine ajuveen", "Поверхностная средняя мозговая вена"], ["Vena thalamostriata superior", "Ülemine talamostriaalveen", "Верхняя таламостриарная вена"], ["Ventriculi cerebri", "Ajuvatsakesed", "Желудочки головного мозга"], ["Ventriculus lateralis", "Külgvatsake", "Боковой желудочек"], ["Ventriculus quartus", "Neljas vatsake", "Четвёртый желудочек"], ["Ventriculus tertius", "Kolmas vatsake", "Третий желудочек"], ["Vermis cerebelli", "Väikeajuuss", "Червь мозжечка"], ["Vertex", "Pealagi", "Темя (макушка)"], ["Vestibulum nasi", "Ninaesik", "Преддверие носа"], ["Vomer", "Sahkluu", "Сошник"]];
+
+        // Merge duplicate Latin synonyms into single glossary entries with aliases
+        const SYNONYM_MERGES = {
+            "Concha inferior nasi": "Concha nasalis inferior",
+            "Concha media nasi": "Concha nasalis media",
+            "Concha superior nasi": "Concha nasalis superior",
+            "Sinus maxillae": "Sinus maxillaris",
+            "Sinus ossis frontalis": "Sinus frontalis",
+            "Sinus ossis sphenoidei": "Sinus sphenoideus",
+            "Choana cranii": "Choana",
+            "Occiput cranii": "Occiput",
+            "Meatus nasalis communis cranii": "Meatus communis nasi",
+            "Meatus nasalis inferior cranii": "Meatus inferior nasi",
+            "Meatus nasalis medius cranii": "Meatus medius nasi",
+            "Meatus nasalis superior cranii": "Meatus superior nasi",
+            "Meatus nasopharyngeus cranii": "Meatus nasopharyngeus",
+            "Recessus sphenoethmoideus cranii": "Recessus sphenoethmoideus"
+        };
+
+        // Normalization helper (strips diacritics for search & normalizes ё -> е)
+        function normalizeSearch(str) {
+            return (str || '')
+                .toLowerCase()
+                .replace(/ё/g, 'е')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[-–—/\\:;.,()[\]]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        const ALIAS_TO_CANONICAL = {};
+        const GLOSSARY_MAP = new Map();
+
+        RAW_GLOSSARY_DATA.forEach(([lat, est, rus]) => {
+            const targetPrimary = SYNONYM_MERGES[lat];
+            if (targetPrimary) {
+                ALIAS_TO_CANONICAL[lat] = targetPrimary;
+            } else {
+                ALIAS_TO_CANONICAL[lat] = lat;
+                GLOSSARY_MAP.set(lat, {
+                    lat,
+                    aliases: [],
+                    est,
+                    rus
+                });
+            }
+        });
+
+        RAW_GLOSSARY_DATA.forEach(([lat]) => {
+            const canonical = SYNONYM_MERGES[lat];
+            if (canonical && GLOSSARY_MAP.has(canonical)) {
+                GLOSSARY_MAP.get(canonical).aliases.push(lat);
+            }
+        });
+
+        const GLOSSARY_DATA = Array.from(GLOSSARY_MAP.values()).map(entry => {
+            const allLat = [entry.lat, ...entry.aliases].join(' ');
+            return {
+                ...entry,
+                searchLat: normalizeSearch(allLat),
+                searchEst: normalizeSearch(entry.est),
+                searchRus: normalizeSearch(entry.rus)
+            };
+        });
 
         // Interface Translations (English, Estonian, Russian)
         const I18N = {
             en: {
+                pageTitle: `CT Viewer & Anatomical Glossary (${GLOSSARY_DATA.length} Terms)`,
                 axial: 'Axial',
                 coronal: 'Coronal',
                 sagittal: 'Sagittal',
-                loadBtn: '📁 Load Screenshots or Folder',
-                dropTitle: 'Load Screenshots or Folder',
+                multiView: '⊞ 3x',
+                multiViewTitle: 'Toggle 3x Multi-Planar Workstation View (Key: 4)',
+                loadBtn: '📁 Files / ZIP',
+                loadFolderBtn: '📂 Folder',
+                dropTitle: 'Load Screenshots, Folder or Archive',
                 extractingZip: '📦 Extracting ZIP archive...',
                 extractingArch: '📦 Extracting 7z / RAR / TAR archive...',
                 invert: 'Invert',
+                pixel: '🏁 Pixel',
                 reset: 'Reset',
                 day: '☀️ Day',
                 night: '🌙 Night',
                 glossary: '📖 Glossary',
+                langTitle: 'Interface Language',
                 searchPlaceholder: 'Search Latin, Eesti, Русский or #slice...',
                 all: 'All',
                 pinned: 'Pinned',
                 ocrScan: '🔍 Auto-Scan (OCR)',
                 ocrStop: '⏹ Stop OCR',
+                clearOcr: '🧹 Clear OCR',
+                clearOcrTitle: 'Remove automatic OCR pins (keep manual pins)',
                 exportBtn: 'Export',
                 importBtn: 'Import',
                 pinBtn: '📌 + Pin',
@@ -722,27 +1101,45 @@
                 pause: '⏸ Pause',
                 slice: 'Slice',
                 termsUnit: 'terms',
+                emptyPlane: 'No slices loaded',
                 alertLoadFirst: 'Please load screenshots or a folder first.',
-                alertNoValid: 'No valid image files or supported archives found.'
+                alertNoValid: 'No valid image files or supported archives found.',
+                alertArchFail: 'Failed to unpack archive.',
+                alertInvalidJson: 'Invalid JSON file.',
+                alertOcrNet: 'Failed to load Tesseract OCR library. Check your internet connection.',
+                ocrStopping: '⏹ Stopping OCR...',
+                ocrStarting: (w, n) => `⚡ Starting ${w} OCR threads (${n} slices)...`,
+                ocrProgress: (done, total, links) => `🔍 OCR: ${done} / ${total} (${links} links)...`,
+                ocrStopped: (links) => `⏹ OCR stopped (${links} links saved).`,
+                ocrComplete: (links, total) => `✅ Complete! Linked ${links} terms across ${total} slices.`,
+                ocrInterrupted: '⚠️ OCR interrupted.'
             },
             et: {
+                pageTitle: `KT-vaatur ja anatoomiline sõnastik (${GLOSSARY_DATA.length} terminit)`,
                 axial: 'Aksiaalne',
                 coronal: 'Koronaarne',
                 sagittal: 'Sagitaalne',
-                loadBtn: '📁 Laadi ekraanipildid või kaust',
-                dropTitle: 'Laadi ekraanipildid või kaust',
+                multiView: '⊞ 3x',
+                multiViewTitle: 'Lülita 3x mitmikvaade sisse/välja (klahv 4)',
+                loadBtn: '📁 Failid / ZIP',
+                loadFolderBtn: '📂 Kaust',
+                dropTitle: 'Laadi ekraanipildid, kaust või arhiiv',
                 extractingZip: '📦 ZIP-arhiivi lahtipakkimine...',
                 extractingArch: '📦 7z / RAR / TAR arhiivi lahtipakkimine...',
                 invert: 'Negatiiv',
+                pixel: '🏁 Piksel',
                 reset: 'Lähtesta',
                 day: '☀️ Päev',
                 night: '🌙 Öö',
                 glossary: '📖 Sõnastik',
+                langTitle: 'Liidese keel',
                 searchPlaceholder: 'Otsi (ladina, eesti, vene või #lõige)...',
                 all: 'Kõik',
                 pinned: 'Kinnitatud',
                 ocrScan: '🔍 Automaatotsing (OCR)',
                 ocrStop: '⏹ Peata OCR',
+                clearOcr: '🧹 Puhasta OCR',
+                clearOcrTitle: 'Eemalda automaatsed OCR-viited (jäta käsitsi lisatud alles)',
                 exportBtn: 'Eksport',
                 importBtn: 'Import',
                 pinBtn: '📌 + Kinnita',
@@ -750,27 +1147,45 @@
                 pause: '⏸ Paus',
                 slice: 'Lõige',
                 termsUnit: 'terminit',
+                emptyPlane: 'Lõikeid pole laaditud',
                 alertLoadFirst: 'Palun laadi esmalt ekraanipildid või kaust.',
-                alertNoValid: 'Sobivaid pildifaile ega arhiive ei leitud.'
+                alertNoValid: 'Sobivaid pildifaile ega arhiive ei leitud.',
+                alertArchFail: 'Arhiivi lahtipakkimine ebaõnnestus.',
+                alertInvalidJson: 'Vigane JSON-fail.',
+                alertOcrNet: 'Tesseract OCR teegi laadimine ebaõnnestus. Kontrolli internetiühendust.',
+                ocrStopping: '⏹ OCR peatamine...',
+                ocrStarting: (w, n) => `⚡ Käivitan ${w} OCR lõime (${n} lõiget)...`,
+                ocrProgress: (done, total, links) => `🔍 OCR: ${done} / ${total} (${links} viidet)...`,
+                ocrStopped: (links) => `⏹ OCR peatatud (${links} viidet salvestatud).`,
+                ocrComplete: (links, total) => `✅ Valmis! Seoti ${links} terminit ${total} lõike vahel.`,
+                ocrInterrupted: '⚠️ OCR katkestati.'
             },
             ru: {
+                pageTitle: `КТ-просмотрщик и анатомический глоссарий (${GLOSSARY_DATA.length} терминов)`,
                 axial: 'Аксиальная',
                 coronal: 'Коронарная',
                 sagittal: 'Сагиттальная',
-                loadBtn: '📁 Загрузить скриншоты или папку',
-                dropTitle: 'Загрузить скриншоты или папку',
+                multiView: '⊞ 3x',
+                multiViewTitle: 'Режим 3 экранов: Axial + Coronal + Sagittal (клавиша 4)',
+                loadBtn: '📁 Файлы / ZIP',
+                loadFolderBtn: '📂 Папка',
+                dropTitle: 'Загрузите скриншоты, папку или архив',
                 extractingZip: '📦 Распаковка ZIP-архива...',
                 extractingArch: '📦 Распаковка 7z / RAR / TAR архива...',
                 invert: 'Негатив',
+                pixel: '🏁 Пиксели',
                 reset: 'Сброс',
                 day: '☀️ День',
                 night: '🌙 Ночь',
                 glossary: '📖 Глоссарий',
+                langTitle: 'Язык интерфейса',
                 searchPlaceholder: 'Поиск (лат., эст., рус. или #срез)...',
                 all: 'Все',
                 pinned: 'Привязанные',
                 ocrScan: '🔍 Авто-скан (OCR)',
                 ocrStop: '⏹ Стоп OCR',
+                clearOcr: '🧹 Сброс OCR',
+                clearOcrTitle: 'Удалить только авто-привязки OCR (ручные останутся)',
                 exportBtn: 'Экспорт',
                 importBtn: 'Импорт',
                 pinBtn: '📌 + Привязать',
@@ -778,45 +1193,203 @@
                 pause: '⏸ Пауза',
                 slice: 'Срез',
                 termsUnit: 'терминов',
+                emptyPlane: 'Срезы не загружены',
                 alertLoadFirst: 'Сначала загрузите скриншоты или папку.',
-                alertNoValid: 'Подходящих изображений или архивов не найдено.'
+                alertNoValid: 'Подходящих изображений или архивов не найдено.',
+                alertArchFail: 'Не удалось распаковать архив.',
+                alertInvalidJson: 'Некорректный JSON-файл.',
+                alertOcrNet: 'Не удалось загрузить библиотеку Tesseract OCR. Проверьте подключение к сети.',
+                ocrStopping: '⏹ Остановка OCR...',
+                ocrStarting: (w, n) => `⚡ Запуск ${w} потоков OCR (${n} срезов)...`,
+                ocrProgress: (done, total, links) => `🔍 OCR: ${done} / ${total} (${links} привязок)...`,
+                ocrStopped: (links) => `⏹ OCR остановлен (сохранено привязок: ${links}).`,
+                ocrComplete: (links, total) => `✅ Готово! Привязано ${links} терминов на ${total} срезах.`,
+                ocrInterrupted: '⚠️ Ошибка выполнения OCR.'
             }
         };
 
         const PLANE_ORDER = ['axial', 'coronal', 'sagittal'];
         const planes = {
-            axial:    { images: [], index: 0, scale: 1, panX: 0, panY: 0 },
-            coronal:  { images: [], index: 0, scale: 1, panX: 0, panY: 0 },
-            sagittal: { images: [], index: 0, scale: 1, panX: 0, panY: 0 }
+            axial:    { images: [], index: 0 },
+            coronal:  { images: [], index: 0 },
+            sagittal: { images: [], index: 0 }
         };
+
+        // Shared zoom & pan state across all planes
+        const viewState = { scale: 1, panX: 0, panY: 0 };
+
         let activePlane = 'axial';
+        let isMultiView = false;
+        let isPixelated = false;
         let currentLang = 'en';
 
-        const STORAGE_KEY = 'ct_viewer_term_links_v2';
+        const BASE_STORAGE_KEY = 'ct_viewer_term_links_v2';
         const THEME_KEY = 'ct_viewer_theme_v1';
         const LANG_KEY = 'ct_viewer_lang_v1';
+        let currentDatasetKey = BASE_STORAGE_KEY;
         let termLinks = {};
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) termLinks = JSON.parse(saved);
-        } catch (e) {}
+
+        function normalizeLinksObject(rawObj) {
+            const out = {};
+            if (!rawObj || typeof rawObj !== 'object') return out;
+            for (const [rawLat, arr] of Object.entries(rawObj)) {
+                if (!Array.isArray(arr)) continue;
+                const canonicalLat = ALIAS_TO_CANONICAL[rawLat] || rawLat;
+                for (const l of arr) {
+                    if (!PLANE_ORDER.includes(l?.plane) || !Number.isInteger(l?.slice) || l.slice < 1) continue;
+                    const src = l.source === 'ocr' ? 'ocr' : 'manual';
+                    (out[canonicalLat] ??= []);
+                    if (!out[canonicalLat].some(x => x.plane === l.plane && x.slice === l.slice)) {
+                        out[canonicalLat].push({ plane: l.plane, slice: l.slice, source: src });
+                    }
+                }
+            }
+            return out;
+        }
+
+        function loadTermLinksForKey(storageKey) {
+            currentDatasetKey = storageKey || BASE_STORAGE_KEY;
+            try {
+                const saved = localStorage.getItem(currentDatasetKey) || localStorage.getItem(BASE_STORAGE_KEY);
+                termLinks = saved ? normalizeLinksObject(JSON.parse(saved)) : {};
+            } catch (e) {
+                termLinks = {};
+            }
+        }
 
         function saveTermLinks() {
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(termLinks));
+                const serialized = JSON.stringify(termLinks);
+                localStorage.setItem(currentDatasetKey, serialized);
+                localStorage.setItem(BASE_STORAGE_KEY, serialized);
             } catch (e) {}
         }
 
+        function updateDatasetFingerprint() {
+            const parts = PLANE_ORDER.map(p => {
+                const imgs = planes[p].images;
+                if (imgs.length === 0) return `${p}:0`;
+                return `${p}:${imgs.length}:${imgs[0].name}:${imgs[imgs.length - 1].name}`;
+            });
+            const fingerprint = `${BASE_STORAGE_KEY}_${parts.join('|')}`;
+            try {
+                const specific = localStorage.getItem(fingerprint);
+                if (specific) {
+                    currentDatasetKey = fingerprint;
+                    termLinks = normalizeLinksObject(JSON.parse(specific));
+                } else {
+                    currentDatasetKey = fingerprint;
+                }
+            } catch (e) {}
+        }
+
+        loadTermLinksForKey(BASE_STORAGE_KEY);
+
+        // Collator for fast natural file path sorting
+        const fileCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+        // Debounce helper
+        function debounce(fn, delay) {
+            let timer = null;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn(...args), delay);
+            };
+        }
+
+        // Lazy script loader with SRI & CORS
+        const loadedScripts = {};
+        function loadExternalScript(src, integrity = null) {
+            if (loadedScripts[src]) return loadedScripts[src];
+            loadedScripts[src] = new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = true;
+                s.crossOrigin = 'anonymous';
+                if (integrity) s.integrity = integrity;
+                s.onload = () => resolve();
+                s.onerror = () => {
+                    if (integrity) {
+                        // Fallback without integrity if CDN sub-version changed
+                        const s2 = document.createElement('script');
+                        s2.src = src;
+                        s2.async = true;
+                        s2.crossOrigin = 'anonymous';
+                        s2.onload = () => resolve();
+                        s2.onerror = reject;
+                        document.head.appendChild(s2);
+                    } else {
+                        reject(new Error(`Failed to load ${src}`));
+                    }
+                };
+                document.head.appendChild(s);
+            });
+            return loadedScripts[src];
+        }
+
+        async function ensureJSZip() {
+            if (typeof JSZip !== 'undefined') return JSZip;
+            await loadExternalScript(
+                'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+                'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG'
+            );
+            return window.JSZip;
+        }
+
+        async function ensureTesseract() {
+            if (typeof Tesseract !== 'undefined') return Tesseract;
+            await loadExternalScript(
+                'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js'
+            );
+            return window.Tesseract;
+        }
+
+        // DOM Elements
         const unifiedInput = document.getElementById('unifiedInput');
+        const folderInput = document.getElementById('folderInput');
         const loadBtnToolbar = document.getElementById('loadBtnToolbar');
+        const loadFolderBtnToolbar = document.getElementById('loadFolderBtnToolbar');
         const loadBtnOverlay = document.getElementById('loadBtnOverlay');
+        const loadFolderBtnOverlay = document.getElementById('loadFolderBtnOverlay');
+        const multiViewBtn = document.getElementById('multiViewBtn');
+
         const dropOverlay = document.getElementById('dropOverlay');
         const dropTitle = document.getElementById('dropTitle');
         const viewport = document.getElementById('viewport');
-        const sliceImage = document.getElementById('sliceImage');
+        const panesGrid = document.getElementById('panesGrid');
         const sliceSlider = document.getElementById('sliceSlider');
         const sliceCounter = document.getElementById('sliceCounter');
         const zoomLabel = document.getElementById('zoomLabel');
+
+        const paneElements = {
+            axial: {
+                pane: document.getElementById('pane-axial'),
+                title: document.getElementById('pane-title-axial'),
+                counter: document.getElementById('pane-counter-axial'),
+                img: document.getElementById('img-axial'),
+                empty: document.getElementById('empty-axial'),
+                slider: document.getElementById('slider-axial')
+            },
+            coronal: {
+                pane: document.getElementById('pane-coronal'),
+                title: document.getElementById('pane-title-coronal'),
+                counter: document.getElementById('pane-counter-coronal'),
+                img: document.getElementById('img-coronal'),
+                empty: document.getElementById('empty-coronal'),
+                slider: document.getElementById('slider-coronal')
+            },
+            sagittal: {
+                pane: document.getElementById('pane-sagittal'),
+                title: document.getElementById('pane-title-sagittal'),
+                counter: document.getElementById('pane-counter-sagittal'),
+                img: document.getElementById('img-sagittal'),
+                empty: document.getElementById('empty-sagittal'),
+                slider: document.getElementById('slider-sagittal')
+            }
+        };
+
+        const loupe = document.getElementById('loupe');
+        const loupeImg = document.getElementById('loupeImg');
 
         const prevBtn = document.getElementById('prevBtn');
         const playBtn = document.getElementById('playBtn');
@@ -826,8 +1399,10 @@
         const brightnessRange = document.getElementById('brightnessRange');
         const contrastRange = document.getElementById('contrastRange');
         const invertBtn = document.getElementById('invertBtn');
+        const pixelatedBtn = document.getElementById('pixelatedBtn');
         const resetBtn = document.getElementById('resetBtn');
         const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const langSwitch = document.getElementById('langSwitch');
 
         const sidebar = document.getElementById('sidebar');
         const toggleGlossaryBtn = document.getElementById('toggleGlossaryBtn');
@@ -838,6 +1413,7 @@
         const filterAllBtn = document.getElementById('filterAllBtn');
         const filterPinnedBtn = document.getElementById('filterPinnedBtn');
         const ocrScanBtn = document.getElementById('ocrScanBtn');
+        const clearOcrBtn = document.getElementById('clearOcrBtn');
         const ocrStatus = document.getElementById('ocrStatus');
         const exportLinksBtn = document.getElementById('exportLinksBtn');
         const importLinksBtn = document.getElementById('importLinksBtn');
@@ -858,25 +1434,45 @@
             return (I18N[currentLang] && I18N[currentLang][key]) || I18N.en[key] || key;
         }
 
+        function hasAnyLoadedSlices() {
+            return PLANE_ORDER.some(p => planes[p].images.length > 0);
+        }
+
+        function syncOverlay() {
+            const shouldHide = isMultiView
+                ? hasAnyLoadedSlices()
+                : planes[activePlane].images.length > 0;
+            dropOverlay.classList.toggle('hidden', shouldHide);
+        }
+
         // Apply UI Language (EN / ET / RU)
         function applyLanguage(lang) {
             if (!I18N[lang]) lang = 'en';
             currentLang = lang;
             document.documentElement.setAttribute('lang', lang);
+            document.title = t('pageTitle');
+            langSwitch.title = t('langTitle');
 
             document.querySelectorAll('.lang-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.lang === lang);
             });
 
-            document.getElementById('tab-label-axial').textContent = t('axial');
-            document.getElementById('tab-label-coronal').textContent = t('coronal');
-            document.getElementById('tab-label-sagittal').textContent = t('sagittal');
+            PLANE_ORDER.forEach(p => {
+                document.getElementById(`tab-label-${p}`).textContent = t(p);
+                paneElements[p].title.textContent = t(p);
+                paneElements[p].empty.textContent = t('emptyPlane');
+            });
 
+            multiViewBtn.textContent = t('multiView');
+            multiViewBtn.title = t('multiViewTitle');
             loadBtnToolbar.textContent = t('loadBtn');
+            loadFolderBtnToolbar.textContent = t('loadFolderBtn');
             loadBtnOverlay.textContent = t('loadBtn');
+            loadFolderBtnOverlay.textContent = t('loadFolderBtn');
             dropTitle.textContent = t('dropTitle');
 
             invertBtn.textContent = t('invert');
+            pixelatedBtn.textContent = t('pixel');
             resetBtn.textContent = t('reset');
             toggleGlossaryBtn.textContent = t('glossary');
 
@@ -887,15 +1483,14 @@
             filterAllBtn.textContent = t('all');
             filterPinnedBtn.textContent = t('pinned');
             ocrScanBtn.textContent = isScanningOCR ? t('ocrStop') : t('ocrScan');
+            clearOcrBtn.textContent = t('clearOcr');
+            clearOcrBtn.title = t('clearOcrTitle');
             exportLinksBtn.textContent = t('exportBtn');
             importLinksBtn.textContent = t('importBtn');
 
             playBtn.textContent = playInterval ? t('pause') : t('play');
 
-            const st = planes[activePlane];
-            const countStr = st.images.length > 0 ? `${st.index + 1} / ${st.images.length}` : '0 / 0';
-            sliceCounter.textContent = `${t('slice')}: ${countStr}`;
-
+            updateBottomBarForActivePlane();
             try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
             renderGlossary();
         }
@@ -904,7 +1499,7 @@
             btn.addEventListener('click', () => applyLanguage(btn.dataset.lang));
         });
 
-        // Day / Night Theme Initialization
+        // Day / Night Theme Initialization with prefers-color-scheme support
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             themeToggleBtn.textContent = theme === 'dark' ? t('day') : t('night');
@@ -915,6 +1510,8 @@
             const savedTheme = localStorage.getItem(THEME_KEY);
             if (savedTheme === 'light' || savedTheme === 'dark') {
                 applyTheme(savedTheme);
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+                applyTheme('light');
             }
             const savedLang = localStorage.getItem(LANG_KEY);
             if (savedLang && I18N[savedLang]) {
@@ -932,12 +1529,72 @@
             toggleGlossaryBtn.classList.remove('active');
         }
 
+        // Upload Buttons Trigger Hidden Inputs (Keyboard Accessible)
+        loadBtnToolbar.addEventListener('click', () => unifiedInput.click());
+        loadBtnOverlay.addEventListener('click', () => unifiedInput.click());
+        loadFolderBtnToolbar.addEventListener('click', () => folderInput.click());
+        loadFolderBtnOverlay.addEventListener('click', () => folderInput.click());
+
+        // 2.2 Toggle 3x Multi-Screen Workstation Mode
+        function setMultiView(enabled) {
+            isMultiView = Boolean(enabled);
+            multiViewBtn.classList.toggle('active', isMultiView);
+            panesGrid.classList.toggle('mode-3x', isMultiView);
+
+            PLANE_ORDER.forEach(p => {
+                const visible = isMultiView || p === activePlane;
+                paneElements[p].pane.classList.toggle('visible', visible);
+                paneElements[p].pane.classList.toggle('active-pane', p === activePlane);
+                if (visible && planes[p].images.length > 0) {
+                    showSliceForPlane(p, planes[p].index);
+                }
+            });
+
+            updateTransform();
+            updateFilters();
+            syncOverlay();
+        }
+
+        multiViewBtn.addEventListener('click', () => setMultiView(!isMultiView));
+
         document.querySelectorAll('.plane-tab').forEach(btn => {
             btn.addEventListener('click', () => {
                 stopPlay();
                 switchPlane(btn.dataset.plane);
             });
         });
+
+        // Clicking or interacting with a pane in 3x mode makes it the active plane
+        PLANE_ORDER.forEach(p => {
+            paneElements[p].pane.addEventListener('mousedown', () => {
+                if (activePlane !== p) switchPlane(p, false);
+            });
+            paneElements[p].pane.addEventListener('touchstart', () => {
+                if (activePlane !== p) switchPlane(p, false);
+            }, { passive: true });
+            paneElements[p].slider.addEventListener('input', e => {
+                stopPlay();
+                if (activePlane !== p) switchPlane(p, false);
+                showSliceForPlane(p, parseInt(e.target.value, 10));
+            });
+        });
+
+        function updateBottomBarForActivePlane() {
+            const st = planes[activePlane];
+            if (st.images.length > 0) {
+                sliceSlider.min = 0;
+                sliceSlider.max = st.images.length - 1;
+                sliceSlider.value = st.index;
+                sliceSlider.disabled = false;
+                sliceCounter.textContent = `${t('slice')}: ${st.index + 1} / ${st.images.length}`;
+            } else {
+                sliceSlider.min = 0;
+                sliceSlider.max = 0;
+                sliceSlider.value = 0;
+                sliceSlider.disabled = true;
+                sliceCounter.textContent = `${t('slice')}: 0 / 0`;
+            }
+        }
 
         function switchPlane(planeName, renderSlice = true) {
             if (!planes[planeName]) return;
@@ -947,36 +1604,59 @@
                 btn.classList.toggle('active', btn.dataset.plane === activePlane);
             });
 
-            dropTitle.textContent = t('dropTitle');
+            PLANE_ORDER.forEach(p => {
+                const visible = isMultiView || p === activePlane;
+                paneElements[p].pane.classList.toggle('visible', visible);
+                paneElements[p].pane.classList.toggle('active-pane', p === activePlane);
+            });
 
+            dropTitle.textContent = t('dropTitle');
             const st = planes[activePlane];
+            const pe = paneElements[activePlane];
+
             if (st.images.length > 0) {
-                dropOverlay.classList.add('hidden');
-                sliceImage.style.display = 'block';
-                sliceSlider.min = 0;
-                sliceSlider.max = st.images.length - 1;
-                sliceSlider.disabled = false;
+                pe.img.style.display = 'block';
+                pe.empty.style.display = 'none';
                 updateTransform();
-                if (renderSlice) showSlice(st.index);
+                if (renderSlice) showSliceForPlane(activePlane, st.index);
+                else updateBottomBarForActivePlane();
             } else {
-                dropOverlay.classList.remove('hidden');
-                sliceImage.style.display = 'none';
-                sliceSlider.min = 0;
-                sliceSlider.max = 0;
-                sliceSlider.value = 0;
-                sliceSlider.disabled = true;
-                sliceCounter.textContent = `${t('slice')}: 0 / 0`;
+                pe.img.style.display = 'none';
+                pe.empty.style.display = 'block';
+                updateBottomBarForActivePlane();
             }
+
+            syncOverlay();
         }
 
         function updatePlaneCounts() {
             PLANE_ORDER.forEach(p => {
-                document.getElementById(`count-${p}`).textContent = `(${planes[p].images.length})`;
+                const len = planes[p].images.length;
+                document.getElementById(`count-${p}`).textContent = `(${len})`;
+                const pe = paneElements[p];
+                if (len > 0) {
+                    pe.slider.min = 0;
+                    pe.slider.max = len - 1;
+                    pe.slider.disabled = false;
+                    pe.img.style.display = 'block';
+                    pe.empty.style.display = 'none';
+                } else {
+                    pe.slider.min = 0;
+                    pe.slider.max = 0;
+                    pe.slider.value = 0;
+                    pe.slider.disabled = true;
+                    pe.counter.textContent = '0 / 0';
+                    pe.img.style.display = 'none';
+                    pe.empty.style.display = 'block';
+                }
             });
         }
 
+        // Only browser-supported raster/vector formats (TIFF only in Safari)
+        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
         function isImageFilename(name) {
-            return /\.(png|jpe?g|bmp|webp|gif|tiff?|avif|svg)$/i.test(name);
+            if (isSafari && /\.tiff?$/i.test(name)) return true;
+            return /\.(png|jpe?g|bmp|webp|gif|avif|svg)$/i.test(name);
         }
 
         function isZipFilename(name) {
@@ -995,31 +1675,48 @@
             return null;
         }
 
+        // Lightweight ±3 neighbor slice preloader (prevents multi-GB RAM spikes)
+        function preloadAroundSlice(planeName, centerIdx) {
+            const imgs = planes[planeName].images;
+            for (let i = 0; i < imgs.length; i++) {
+                const dist = Math.abs(i - centerIdx);
+                if (dist <= 3) {
+                    if (!imgs[i].preloadRef) {
+                        const im = new Image();
+                        im.decoding = 'async';
+                        im.src = imgs[i].url;
+                        im.decode?.().catch(() => {});
+                        imgs[i].preloadRef = im;
+                    }
+                } else if (dist > 8 && imgs[i].preloadRef) {
+                    imgs[i].preloadRef = null;
+                }
+            }
+        }
+
         function setPlaneFiles(planeName, itemArray) {
             const st = planes[planeName];
             st.images.forEach(item => URL.revokeObjectURL(item.url));
 
-            itemArray.sort((a, b) =>
-                a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
-            );
+            // Sort by fullPath using shared Intl.Collator
+            itemArray.sort((a, b) => fileCollator.compare(a.fullPath || a.name, b.fullPath || b.name));
 
-            st.images = itemArray.map(item => {
-                const url = URL.createObjectURL(item.blob);
-                const preload = new Image();
-                preload.decoding = 'async';
-                preload.src = url;
-                return {
-                    name: item.name,
-                    url: url,
-                    preloadRef: preload,
-                    ocrText: ''
-                };
-            });
+            st.images = itemArray.map(item => ({
+                name: item.name,
+                fullPath: item.fullPath || item.name,
+                url: URL.createObjectURL(item.blob),
+                preloadRef: null,
+                ocrText: '',
+                ocrNorm: ''
+            }));
 
             st.index = 0;
+            if (st.images.length > 0) {
+                preloadAroundSlice(planeName, 0);
+            }
         }
 
-        // Dynamic loader for libarchive.js (.7z, .rar, .tar, .gz, .bz2, .xz, .zip)
+        // Dynamic loader for libarchive.js (.7z, .rar, .tar, .gz, .bz2, .xz)
         let libarchiveReadyPromise = null;
         async function getLibArchive() {
             if (!libarchiveReadyPromise) {
@@ -1101,121 +1798,162 @@
             const zipFiles = [];
             const otherArchives = [];
 
-            const itemsToProcess = customPaths || Array.from(fileList).map(f => ({
-                file: f,
-                fullPath: (f.webkitRelativePath || '') + ' ' + f.name
-            }));
+            try {
+                const itemsToProcess = customPaths || Array.from(fileList).map(f => ({
+                    file: f,
+                    fullPath: f.webkitRelativePath ? f.webkitRelativePath : f.name
+                }));
 
-            itemsToProcess.forEach(({ file, fullPath }) => {
-                if (isZipFilename(file.name)) {
-                    zipFiles.push(file);
-                } else if (isOtherArchiveFilename(file.name)) {
-                    otherArchives.push(file);
-                } else if (file.type.startsWith('image/') || isImageFilename(file.name)) {
-                    extractedItems.push({
-                        name: file.name,
-                        fullPath: fullPath,
-                        blob: file
-                    });
-                }
-            });
-
-            if (zipFiles.length > 0 && typeof JSZip !== 'undefined') {
-                dropOverlay.classList.remove('hidden');
-                dropTitle.textContent = t('extractingZip');
-                for (const zf of zipFiles) {
-                    try {
-                        const zip = await JSZip.loadAsync(zf);
-                        const entries = [];
-                        zip.forEach((relativePath, zipEntry) => {
-                            if (!zipEntry.dir && !relativePath.includes('__MACOSX') && isImageFilename(zipEntry.name)) {
-                                entries.push({ relativePath, zipEntry });
-                            }
+                itemsToProcess.forEach(({ file, fullPath }) => {
+                    if (isZipFilename(file.name)) {
+                        zipFiles.push(file);
+                    } else if (isOtherArchiveFilename(file.name)) {
+                        otherArchives.push(file);
+                    } else if (isImageFilename(file.name)) {
+                        extractedItems.push({
+                            name: file.name,
+                            fullPath: fullPath,
+                            blob: file
                         });
-                        for (const entry of entries) {
-                            const blob = await entry.zipEntry.async('blob');
-                            const shortName = entry.relativePath.split('/').pop();
-                            extractedItems.push({
-                                name: shortName,
-                                fullPath: entry.relativePath,
-                                blob: blob
-                            });
+                    }
+                });
+
+                if (zipFiles.length > 0) {
+                    dropOverlay.classList.remove('hidden');
+                    dropTitle.textContent = t('extractingZip');
+                    try {
+                        const JSZipLib = await ensureJSZip();
+                        for (const zf of zipFiles) {
+                            try {
+                                const zip = await JSZipLib.loadAsync(zf);
+                                const entries = [];
+                                zip.forEach((relativePath, zipEntry) => {
+                                    if (!zipEntry.dir && !relativePath.includes('__MACOSX') && isImageFilename(zipEntry.name)) {
+                                        entries.push({ relativePath, zipEntry });
+                                    }
+                                });
+                                for (const entry of entries) {
+                                    const blob = await entry.zipEntry.async('blob');
+                                    const shortName = entry.relativePath.split('/').pop();
+                                    extractedItems.push({
+                                        name: shortName,
+                                        fullPath: entry.relativePath,
+                                        blob: blob
+                                    });
+                                }
+                            } catch (err) {
+                                otherArchives.push(zf);
+                            }
+                        }
+                    } catch (e) {
+                        otherArchives.push(...zipFiles);
+                    }
+                }
+
+                if (otherArchives.length > 0) {
+                    dropOverlay.classList.remove('hidden');
+                    dropTitle.textContent = t('extractingArch');
+                    try {
+                        const Archive = await getLibArchive();
+                        for (const archFile of otherArchives) {
+                            const archive = await Archive.open(archFile);
+                            const filesObj = await archive.getFilesObject();
+                            await collectLibArchiveEntries(filesObj, '', extractedItems);
                         }
                     } catch (err) {
-                        otherArchives.push(zf);
+                        alert(t('alertArchFail'));
                     }
                 }
-            }
 
-            if (otherArchives.length > 0) {
-                dropOverlay.classList.remove('hidden');
-                dropTitle.textContent = t('extractingArch');
-                try {
-                    const Archive = await getLibArchive();
-                    for (const archFile of otherArchives) {
-                        const archive = await Archive.open(archFile);
-                        const filesObj = await archive.getFilesObject();
-                        await collectLibArchiveEntries(filesObj, '', extractedItems);
+                if (extractedItems.length === 0) {
+                    alert(t('alertNoValid'));
+                    return;
+                }
+
+                const buckets = { axial: [], coronal: [], sagittal: [], unknown: [] };
+                extractedItems.forEach(item => {
+                    const detected = detectPlaneFromPath(item.fullPath);
+                    if (detected) buckets[detected].push(item);
+                    else buckets.unknown.push(item);
+                });
+
+                const hasAutoDetected = buckets.axial.length > 0 || buckets.coronal.length > 0 || buckets.sagittal.length > 0;
+
+                if (hasAutoDetected) {
+                    if (buckets.axial.length > 0) setPlaneFiles('axial', buckets.axial);
+                    if (buckets.coronal.length > 0) setPlaneFiles('coronal', buckets.coronal);
+                    if (buckets.sagittal.length > 0) setPlaneFiles('sagittal', buckets.sagittal);
+                    if (buckets.unknown.length > 0 && planes[activePlane].images.length === 0) {
+                        setPlaneFiles(activePlane, buckets.unknown);
                     }
-                } catch (err) {
-                    alert('Failed to unpack archive.');
-                }
-            }
 
-            dropTitle.textContent = t('dropTitle');
+                    updatePlaneCounts();
+                    PLANE_ORDER.forEach(p => {
+                        if (planes[p].images.length > 0) showSliceForPlane(p, 0);
+                    });
 
-            if (extractedItems.length === 0) {
-                alert(t('alertNoValid'));
-                return;
-            }
+                    const loadedPlanesCount = PLANE_ORDER.filter(p => planes[p].images.length > 0).length;
+                    if (loadedPlanesCount >= 2 && isMultiView) {
+                        setMultiView(true);
+                    }
 
-            const buckets = { axial: [], coronal: [], sagittal: [], unknown: [] };
-            extractedItems.forEach(item => {
-                const detected = detectPlaneFromPath(item.fullPath);
-                if (detected) buckets[detected].push(item);
-                else buckets.unknown.push(item);
-            });
-
-            const hasAutoDetected = buckets.axial.length > 0 || buckets.coronal.length > 0 || buckets.sagittal.length > 0;
-
-            if (hasAutoDetected) {
-                if (buckets.axial.length > 0) setPlaneFiles('axial', buckets.axial);
-                if (buckets.coronal.length > 0) setPlaneFiles('coronal', buckets.coronal);
-                if (buckets.sagittal.length > 0) setPlaneFiles('sagittal', buckets.sagittal);
-                if (buckets.unknown.length > 0 && planes[activePlane].images.length === 0) {
-                    setPlaneFiles(activePlane, buckets.unknown);
+                    if (buckets[activePlane].length > 0) switchPlane(activePlane);
+                    else if (buckets.axial.length > 0) switchPlane('axial');
+                    else if (buckets.coronal.length > 0) switchPlane('coronal');
+                    else if (buckets.sagittal.length > 0) switchPlane('sagittal');
+                } else {
+                    setPlaneFiles(activePlane, extractedItems);
+                    updatePlaneCounts();
+                    switchPlane(activePlane);
                 }
 
-                updatePlaneCounts();
-                if (buckets[activePlane].length > 0) switchPlane(activePlane);
-                else if (buckets.axial.length > 0) switchPlane('axial');
-                else if (buckets.coronal.length > 0) switchPlane('coronal');
-                else if (buckets.sagittal.length > 0) switchPlane('sagittal');
-            } else {
-                setPlaneFiles(activePlane, extractedItems);
-                updatePlaneCounts();
-                switchPlane(activePlane);
+                updateDatasetFingerprint();
+                renderGlossary();
+            } finally {
+                dropTitle.textContent = t('dropTitle');
+                syncOverlay();
             }
         }
 
-        function showSlice(index) {
-            const st = planes[activePlane];
+        function showSliceForPlane(planeName, index) {
+            const st = planes[planeName];
+            const pe = paneElements[planeName];
             if (st.images.length === 0) return;
             if (index < 0) index = 0;
             if (index >= st.images.length) index = st.images.length - 1;
 
             st.index = index;
             const current = st.images[st.index];
-            sliceImage.src = current.url;
-            sliceSlider.value = st.index;
+            pe.img.src = current.url;
+            pe.slider.value = st.index;
+            pe.counter.textContent = `${st.index + 1} / ${st.images.length}`;
 
-            const textCount = `${st.index + 1} / ${st.images.length}`;
-            sliceCounter.textContent = `${t('slice')}: ${textCount}`;
+            preloadAroundSlice(planeName, st.index);
+
+            if (planeName === activePlane) {
+                updateBottomBarForActivePlane();
+            }
+            if (loupeState.active && loupeState.plane === planeName) {
+                loupeImg.src = current.url;
+            }
         }
 
-        // Seamless Manual & Automatic Stepping Across Axial <-> Coronal <-> Sagittal (No Infinite Loop)
-        function stepSlice(delta) {
+        function showSlice(index) {
+            showSliceForPlane(activePlane, index);
+        }
+
+        // Step slices for a specific plane or seamlessly across Axial <-> Coronal <-> Sagittal
+        function stepSlice(delta, specificPlane = null) {
             if (delta === 0) return false;
+
+            if (specificPlane && planes[specificPlane].images.length > 0) {
+                const st = planes[specificPlane];
+                const nextIdx = Math.min(Math.max(st.index + delta, 0), st.images.length - 1);
+                if (activePlane !== specificPlane) switchPlane(specificPlane, false);
+                showSliceForPlane(specificPlane, nextIdx);
+                return nextIdx !== st.index;
+            }
+
             const nonEmptyPlanes = PLANE_ORDER.filter(p => planes[p].images.length > 0);
             if (nonEmptyPlanes.length === 0) return false;
 
@@ -1228,32 +1966,28 @@
             let targetPlane = activePlane;
             let targetIndex = planes[targetPlane].index + delta;
 
-            // Step forward across plane boundaries (Axial -> Coronal -> Sagittal)
             while (targetIndex >= planes[targetPlane].images.length) {
                 const curOrderIdx = nonEmptyPlanes.indexOf(targetPlane);
                 if (curOrderIdx < nonEmptyPlanes.length - 1) {
                     targetIndex -= planes[targetPlane].images.length;
                     targetPlane = nonEmptyPlanes[curOrderIdx + 1];
                 } else {
-                    // Reached the very end of the last loaded plane
                     targetIndex = planes[targetPlane].images.length - 1;
                     if (targetPlane !== activePlane) switchPlane(targetPlane, false);
-                    showSlice(targetIndex);
-                    return false; // Indicates we hit the end boundary
+                    showSliceForPlane(targetPlane, targetIndex);
+                    return false;
                 }
             }
 
-            // Step backward across plane boundaries (Sagittal -> Coronal -> Axial)
             while (targetIndex < 0) {
                 const curOrderIdx = nonEmptyPlanes.indexOf(targetPlane);
                 if (curOrderIdx > 0) {
                     targetPlane = nonEmptyPlanes[curOrderIdx - 1];
                     targetIndex += planes[targetPlane].images.length;
                 } else {
-                    // Reached the very first slice of the first loaded plane
                     targetIndex = 0;
                     if (targetPlane !== activePlane) switchPlane(targetPlane, false);
-                    showSlice(0);
+                    showSliceForPlane(targetPlane, 0);
                     return false;
                 }
             }
@@ -1261,26 +1995,36 @@
             if (targetPlane !== activePlane) {
                 switchPlane(targetPlane, false);
             }
-            showSlice(targetIndex);
+            showSliceForPlane(targetPlane, targetIndex);
             return true;
         }
 
         function updateTransform() {
-            const st = planes[activePlane];
-            sliceImage.style.transform = `translate(${st.panX}px, ${st.panY}px) scale(${st.scale})`;
-            zoomLabel.textContent = `${Math.round(st.scale * 100)}%`;
+            const transformStr = `translate(${viewState.panX}px, ${viewState.panY}px) scale(${viewState.scale})`;
+            PLANE_ORDER.forEach(p => {
+                paneElements[p].img.style.transform = transformStr;
+            });
+            zoomLabel.textContent = `${Math.round(viewState.scale * 100)}%`;
         }
 
         function updateFilters() {
-            const inv = inverted ? 100 : 0;
-            sliceImage.style.filter = `brightness(${brightness}%) contrast(${contrast}%) invert(${inv}%)`;
+            const isDefault = brightness === 100 && contrast === 100 && !inverted;
+            const filterStr = isDefault
+                ? 'none'
+                : `brightness(${brightness}%) contrast(${contrast}%) invert(${inverted ? 100 : 0}%)`;
+
+            PLANE_ORDER.forEach(p => {
+                paneElements[p].img.style.filter = filterStr;
+                paneElements[p].img.classList.toggle('pixelated', isPixelated);
+            });
+            loupeImg.style.filter = filterStr;
+            loupeImg.classList.toggle('pixelated', isPixelated);
         }
 
         function resetView() {
-            const st = planes[activePlane];
-            st.scale = 1;
-            st.panX = 0;
-            st.panY = 0;
+            viewState.scale = 1;
+            viewState.panX = 0;
+            viewState.panY = 0;
             brightness = 100;
             contrast = 100;
             inverted = false;
@@ -1291,7 +2035,7 @@
             updateFilters();
         }
 
-        // --- Sequential Play Across Axial -> Coronal -> Sagittal (No Loop) ---
+        // --- Sequential Play Across Axial -> Coronal -> Sagittal ---
         function stopPlay() {
             if (playInterval) {
                 clearInterval(playInterval);
@@ -1333,38 +2077,46 @@
 
         playBtn.addEventListener('click', togglePlay);
 
-        function renderGlossary() {
-            const query = searchInput.value.trim().toLowerCase();
-            clearSearchBtn.style.display = query ? 'block' : 'none';
-
+        // Separate query navigation from renderGlossary so pinning/OCR never jumps slices
+        function jumpToSliceFromQuery(rawQuery) {
+            const q = normalizeSearch(rawQuery);
+            if (!q) return;
             const st = planes[activePlane];
-            if (query && st.images.length > 0) {
-                const numMatch = query.match(/^#?(\d+)$/);
-                if (numMatch) {
-                    const targetSlice = parseInt(numMatch[1], 10) - 1;
-                    if (targetSlice >= 0 && targetSlice < st.images.length) {
-                        showSlice(targetSlice);
-                    }
-                } else {
-                    const fileIdx = st.images.findIndex(img =>
-                        img.name.toLowerCase().includes(query) ||
-                        (img.ocrText && img.ocrText.includes(query))
-                    );
-                    if (fileIdx !== -1) showSlice(fileIdx);
+            if (st.images.length === 0) return;
+
+            const numMatch = rawQuery.trim().match(/^#?(\d+)$/);
+            if (numMatch) {
+                const targetSlice = parseInt(numMatch[1], 10) - 1;
+                if (targetSlice >= 0 && targetSlice < st.images.length) {
+                    showSlice(targetSlice);
                 }
+                return;
             }
+
+            const fileIdx = st.images.findIndex(img =>
+                normalizeSearch(img.name).includes(q) ||
+                (img.ocrNorm && img.ocrNorm.includes(q))
+            );
+            if (fileIdx !== -1) showSlice(fileIdx);
+        }
+
+        function renderGlossary() {
+            const rawQuery = searchInput.value.trim();
+            const query = normalizeSearch(rawQuery);
+            clearSearchBtn.style.display = rawQuery ? 'block' : 'none';
 
             const fragment = document.createDocumentFragment();
             let visibleCount = 0;
 
-            GLOSSARY_DATA.forEach(([lat, est, rus]) => {
+            GLOSSARY_DATA.forEach(entry => {
+                const { lat, aliases, est, rus, searchLat, searchEst, searchRus } = entry;
                 const links = termLinks[lat] || [];
                 if (showOnlyPinned && links.length === 0) return;
 
                 if (query) {
-                    const matchLat = lat.toLowerCase().includes(query);
-                    const matchEst = est.toLowerCase().includes(query);
-                    const matchRus = rus.toLowerCase().includes(query);
+                    const matchLat = searchLat.includes(query);
+                    const matchEst = searchEst.includes(query);
+                    const matchRus = searchRus.includes(query);
                     const matchLink = links.some(l => `${l.plane} ${l.slice}`.toLowerCase().includes(query));
                     if (!matchLat && !matchEst && !matchRus && !matchLink) return;
                 }
@@ -1379,8 +2131,15 @@
                 const latEl = document.createElement('div');
                 latEl.className = 'term-lat';
                 latEl.textContent = lat;
+                if (aliases.length > 0) {
+                    const aliasSpan = document.createElement('span');
+                    aliasSpan.className = 'term-alias';
+                    aliasSpan.textContent = `= ${aliases.join(', ')}`;
+                    latEl.appendChild(aliasSpan);
+                }
 
                 const pinBtn = document.createElement('button');
+                pinBtn.type = 'button';
                 pinBtn.className = 'pin-btn';
                 pinBtn.textContent = t('pinBtn');
                 pinBtn.addEventListener('click', () => pinTermToCurrentSlice(lat));
@@ -1390,11 +2149,21 @@
 
                 const estEl = document.createElement('div');
                 estEl.className = 'term-est';
-                estEl.textContent = `🇪🇪 ${est}`;
+                const estTag = document.createElement('span');
+                estTag.className = 'lang-tag';
+                estTag.textContent = 'ET';
+                const estText = document.createElement('span');
+                estText.textContent = est;
+                estEl.append(estTag, estText);
 
                 const rusEl = document.createElement('div');
                 rusEl.className = 'term-rus';
-                rusEl.textContent = `🇷🇺 ${rus}`;
+                const rusTag = document.createElement('span');
+                rusTag.className = 'lang-tag';
+                rusTag.textContent = 'RU';
+                const rusText = document.createElement('span');
+                rusText.textContent = rus;
+                rusEl.append(rusTag, rusText);
 
                 card.appendChild(topRow);
                 card.appendChild(estEl);
@@ -1406,9 +2175,16 @@
 
                     links.forEach((lnk, idx) => {
                         const badge = document.createElement('span');
-                        badge.className = 'slice-badge';
-                        const shortPlane = lnk.plane.slice(0, 3).toUpperCase();
-                        badge.innerHTML = `<span>${shortPlane} #${lnk.slice}</span><span class="del-link">×</span>`;
+                        badge.className = 'slice-badge' + (lnk.source === 'ocr' ? ' ocr-link' : '');
+                        const shortPlane = String(lnk.plane).slice(0, 3).toUpperCase();
+
+                        // Safe DOM construction (prevents XSS from imported JSON)
+                        const label = document.createElement('span');
+                        label.textContent = `${shortPlane} #${lnk.slice}`;
+                        const del = document.createElement('span');
+                        del.className = 'del-link';
+                        del.textContent = '×';
+                        badge.append(label, del);
 
                         badge.addEventListener('click', e => {
                             if (e.target.classList.contains('del-link')) {
@@ -1416,7 +2192,7 @@
                             } else {
                                 stopPlay();
                                 switchPlane(lnk.plane, false);
-                                showSlice(lnk.slice - 1);
+                                showSliceForPlane(lnk.plane, lnk.slice - 1);
                                 if (window.innerWidth <= 820) {
                                     sidebar.classList.add('collapsed');
                                     toggleGlossaryBtn.classList.remove('active');
@@ -1439,11 +2215,16 @@
 
         function pinTermToCurrentSlice(lat) {
             const st = planes[activePlane];
-            const sliceNum = st.images.length > 0 ? st.index + 1 : 1;
+            if (st.images.length === 0) return;
+            const sliceNum = st.index + 1;
             if (!termLinks[lat]) termLinks[lat] = [];
-            const exists = termLinks[lat].some(l => l.plane === activePlane && l.slice === sliceNum);
-            if (!exists) {
-                termLinks[lat].push({ plane: activePlane, slice: sliceNum });
+            const existing = termLinks[lat].find(l => l.plane === activePlane && l.slice === sliceNum);
+            if (!existing) {
+                termLinks[lat].push({ plane: activePlane, slice: sliceNum, source: 'manual' });
+                saveTermLinks();
+                renderGlossary();
+            } else if (existing.source === 'ocr') {
+                existing.source = 'manual';
                 saveTermLinks();
                 renderGlossary();
             }
@@ -1477,28 +2258,40 @@
                 .replace(/й/g, 'и');
         }
 
-        function getTermCandidates(lat, est, rus) {
+        // Short vernacular words that cause false positives in OCR if matched alone
+        const OCR_SHORT_STOPWORDS = new Set(['pea', 'suu', 'ige', 'oim', 'luu', 'рот', 'ухо', 'нос', 'шея', 'лоб']);
+
+        function getTermCandidates(entry) {
             const rawList = [];
-            const addCand = s => {
-                const n = normalizeText(s);
-                if (n.length >= 3) rawList.push(n);
+            const addCand = (s, isVernacular = false) => {
+                const noBrackets = (s || '').replace(/\[.*?\]/g, '').trim();
+                const n = normalizeText(noBrackets);
+                if (!n) return;
+                if (isVernacular && n.length < 4) return;
+                if (!isVernacular && n.length < 3) return;
+                if (OCR_SHORT_STOPWORDS.has(n)) return;
+                if (!rawList.includes(n)) rawList.push(n);
             };
 
-            const latNoBrackets = lat.replace(/\[.*?\]/g, '').trim();
-            addCand(latNoBrackets);
+            [entry.lat, ...entry.aliases].forEach(latName => {
+                const latNoBrackets = latName.replace(/\[.*?\]/g, '').trim();
+                addCand(latNoBrackets, false);
 
-            if (latNoBrackets.includes(':') || latNoBrackets.includes(';')) {
-                const subParts = latNoBrackets.split(/[:;]/).map(s => s.trim());
-                subParts.slice(1).forEach(addCand);
-            }
+                if (latNoBrackets.includes(':') || latNoBrackets.includes(';')) {
+                    const subParts = latNoBrackets.split(/[:;]/).map(s => s.trim());
+                    subParts.slice(1).forEach(sp => addCand(sp, false));
+                }
+            });
 
-            addCand(est.split('(')[0]);
-            const estParen = est.match(/\(([^)]+)\)/);
-            if (estParen) addCand(estParen[1]);
+            const estClean = entry.est.replace(/\[.*?\]/g, '').trim();
+            addCand(estClean.split('(')[0], true);
+            const estParen = estClean.match(/\(([^)]+)\)/);
+            if (estParen) addCand(estParen[1], true);
 
-            addCand(rus.split('(')[0]);
-            const rusParen = rus.match(/\(([^)]+)\)/);
-            if (rusParen) addCand(rusParen[1]);
+            const rusClean = entry.rus.replace(/\[.*?\]/g, '').trim();
+            addCand(rusClean.split('(')[0], true);
+            const rusParen = rusClean.match(/\(([^)]+)\)/);
+            if (rusParen) addCand(rusParen[1], true);
 
             return rawList.map(cand => {
                 const skelCand = skeletonText(cand);
@@ -1511,61 +2304,100 @@
             });
         }
 
-        const PRECOMPILED_GLOSSARY = GLOSSARY_DATA.map(([lat, est, rus]) => ({
-            lat,
-            candidates: getTermCandidates(lat, est, rus)
+        const PRECOMPILED_GLOSSARY = GLOSSARY_DATA.map(entry => ({
+            lat: entry.lat,
+            candidates: getTermCandidates(entry)
         }));
 
-        function editDistance(a, b) {
-            if (Math.abs(a.length - b.length) > 3) return 99;
-            const dp = Array.from({ length: a.length + 1 }, (_, i) => i);
-            for (let j = 1; j <= b.length; j++) {
-                let prev = dp[0];
-                dp[0] = j;
-                for (let i = 1; i <= a.length; i++) {
-                    const temp = dp[i];
-                    dp[i] = a[i - 1] === b[j - 1]
-                        ? prev
-                        : 1 + Math.min(prev, dp[i], dp[i - 1]);
+        // Reusable buffer for fast bounded Levenshtein distance
+        const dpBuffer = new Int32Array(128);
+        function editDistance(a, b, maxAllowed) {
+            const lenA = a.length;
+            const lenB = b.length;
+            if (Math.abs(lenA - lenB) > maxAllowed) return maxAllowed + 1;
+            if (lenA === 0) return lenB;
+            if (lenB === 0) return lenA;
+
+            for (let i = 0; i <= lenA; i++) dpBuffer[i] = i;
+
+            for (let j = 1; j <= lenB; j++) {
+                let prev = dpBuffer[0];
+                dpBuffer[0] = j;
+                let rowMin = dpBuffer[0];
+                const bChar = b.charCodeAt(j - 1);
+                for (let i = 1; i <= lenA; i++) {
+                    const temp = dpBuffer[i];
+                    const cost = a.charCodeAt(i - 1) === bChar ? prev : 1 + Math.min(prev, dpBuffer[i], dpBuffer[i - 1]);
+                    dpBuffer[i] = cost;
+                    if (cost < rowMin) rowMin = cost;
                     prev = temp;
                 }
+                if (rowMin > maxAllowed) return maxAllowed + 1;
             }
-            return dp[a.length];
+            return dpBuffer[lenA];
         }
 
-        function matchesSliceOCR(compiledCandidates, normSlice, skelSlice, skelWords) {
-            const paddedNorm = ` ${normSlice} `;
-            const paddedSkel = ` ${skelSlice} `;
+        function matchSliceOCRBestCandidate(compiledCandidates, paddedNorm, paddedSkel, normSlice, skelSlice, skelWords, skelWordSet) {
+            let bestMatchedCand = null;
+
+            const recordMatch = candStr => {
+                if (!bestMatchedCand || candStr.length > bestMatchedCand.length) {
+                    bestMatchedCand = candStr;
+                }
+            };
 
             for (const { cand, skelCand, isShort, candWords } of compiledCandidates) {
                 if (isShort) {
                     if (paddedNorm.includes(` ${cand} `) || paddedSkel.includes(` ${skelCand} `)) {
-                        return true;
+                        recordMatch(skelCand);
                     }
                     continue;
                 }
 
                 if (normSlice.includes(cand) || skelSlice.includes(skelCand)) {
-                    return true;
+                    recordMatch(skelCand);
+                    continue;
                 }
 
-                if (candWords.length > 0 && skelWords.length >= candWords.length) {
-                    for (let idx = 0; idx <= skelWords.length - candWords.length; idx++) {
+                const cLen = candWords.length;
+                if (cLen > 0 && skelWords.length >= cLen) {
+                    const firstTarget = candWords[0];
+                    const firstMaxErr = firstTarget.length >= 7 ? 2 : (firstTarget.length >= 5 ? 1 : 0);
+
+                    if (firstMaxErr === 0 && !skelWordSet.has(firstTarget)) {
+                        continue;
+                    }
+
+                    const limit = skelWords.length - cLen;
+                    for (let idx = 0; idx <= limit; idx++) {
+                        const firstActual = skelWords[idx];
+                        if (Math.abs(firstTarget.length - firstActual.length) > firstMaxErr) continue;
+                        if (firstMaxErr === 0 ? firstTarget !== firstActual : editDistance(firstTarget, firstActual, firstMaxErr) > firstMaxErr) {
+                            continue;
+                        }
+
                         let allWordsClose = true;
-                        for (let w = 0; w < candWords.length; w++) {
+                        for (let w = 1; w < cLen; w++) {
                             const targetW = candWords[w];
                             const actualW = skelWords[idx + w];
-                            const maxAllowedErrors = targetW.length >= 7 ? 2 : (targetW.length >= 5 ? 1 : 0);
-                            if (editDistance(targetW, actualW) > maxAllowedErrors) {
+                            const maxErr = targetW.length >= 7 ? 2 : (targetW.length >= 5 ? 1 : 0);
+                            if (Math.abs(targetW.length - actualW.length) > maxErr) {
+                                allWordsClose = false;
+                                break;
+                            }
+                            if (maxErr === 0 ? targetW !== actualW : editDistance(targetW, actualW, maxErr) > maxErr) {
                                 allWordsClose = false;
                                 break;
                             }
                         }
-                        if (allWordsClose) return true;
+                        if (allWordsClose) {
+                            recordMatch(skelCand);
+                            break;
+                        }
                     }
                 }
             }
-            return false;
+            return bestMatchedCand;
         }
 
         async function prepareHighResOCRBlob(url) {
@@ -1590,7 +2422,7 @@
         ocrScanBtn.addEventListener('click', async () => {
             if (isScanningOCR) {
                 cancelOCRRequested = true;
-                ocrStatus.textContent = '⏹ Stopping OCR...';
+                ocrStatus.textContent = t('ocrStopping');
                 return;
             }
 
@@ -1605,85 +2437,132 @@
                 alert(t('alertLoadFirst'));
                 return;
             }
-            if (typeof Tesseract === 'undefined') {
-                alert('Tesseract OCR library requires an internet connection.');
-                return;
-            }
 
             isScanningOCR = true;
             cancelOCRRequested = false;
             ocrStatus.style.display = 'block';
             ocrScanBtn.classList.add('active');
             ocrScanBtn.textContent = t('ocrStop');
+
             let matchedTotal = 0;
             let completedSlices = 0;
+            let scheduler = null;
 
             try {
-                const numWorkers = Math.min(navigator.hardwareConcurrency || 4, 4);
-                ocrStatus.textContent = `⚡ Starting ${numWorkers} OCR threads (${jobs.length} slices)...`;
+                const TesseractLib = await ensureTesseract();
+                const isMobileDevice = window.innerWidth <= 820 || /Mobi|Android/i.test(navigator.userAgent);
+                const maxThreads = isMobileDevice ? 2 : 4;
+                const numWorkers = Math.min(navigator.hardwareConcurrency || maxThreads, maxThreads);
 
-                const scheduler = Tesseract.createScheduler();
+                ocrStatus.textContent = t('ocrStarting')(numWorkers, jobs.length);
+
+                scheduler = TesseractLib.createScheduler();
                 await Promise.all(Array.from({ length: numWorkers }, async () => {
-                    const w = await Tesseract.createWorker(['eng', 'est', 'rus']);
+                    const w = await TesseractLib.createWorker(['eng', 'est', 'rus']);
                     await w.setParameters({ tessedit_pageseg_mode: '11' });
                     scheduler.addWorker(w);
                 }));
 
-                await Promise.all(jobs.map(async ({ planeName, imgObj, sliceNum }) => {
-                    if (cancelOCRRequested) return;
-                    const hiResBlob = await prepareHighResOCRBlob(imgObj.url);
-                    if (cancelOCRRequested) return;
+                // Bounded concurrency worker pool (prevents memory blowup on 100+ slices)
+                let nextJobIndex = 0;
+                const runner = async () => {
+                    while (!cancelOCRRequested) {
+                        const i = nextJobIndex++;
+                        if (i >= jobs.length) break;
+                        const { planeName, imgObj, sliceNum } = jobs[i];
 
-                    const ret = await scheduler.addJob('recognize', hiResBlob);
-                    if (cancelOCRRequested) return;
+                        try {
+                            let normSlice = imgObj.ocrText;
+                            let skelSlice = '';
 
-                    let reconstructedLines = ret.data.text || '';
-                    if (ret.data.lines && ret.data.lines.length > 1) {
-                        const lines = ret.data.lines.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0);
-                        for (let a = 0; a < lines.length; a++) {
-                            for (let b = a + 1; b < lines.length; b++) {
-                                const dy = lines[b].bbox.y0 - lines[a].bbox.y1;
-                                const dx = Math.abs(lines[b].bbox.x0 - lines[a].bbox.x0);
-                                if (dy >= -8 && dy <= 36 && dx <= 140) {
-                                    reconstructedLines += ' ' + lines[a].text + ' ' + lines[b].text;
+                            if (!normSlice) {
+                                const hiResBlob = await prepareHighResOCRBlob(imgObj.url);
+                                if (cancelOCRRequested) break;
+
+                                const ret = await scheduler.addJob('recognize', hiResBlob);
+                                if (cancelOCRRequested) break;
+
+                                let reconstructedLines = ret.data.text || '';
+                                if (ret.data.lines && ret.data.lines.length > 1) {
+                                    const lines = ret.data.lines.slice().sort((a, b) => a.bbox.y0 - b.bbox.y0);
+                                    for (let a = 0; a < lines.length; a++) {
+                                        for (let b = a + 1; b < lines.length; b++) {
+                                            const dy = lines[b].bbox.y0 - lines[a].bbox.y1;
+                                            if (dy > 36) break; // Early exit since lines are sorted by y0
+                                            const dx = Math.abs(lines[b].bbox.x0 - lines[a].bbox.x0);
+                                            if (dy >= -8 && dx <= 140) {
+                                                reconstructedLines += ' ' + lines[a].text + ' ' + lines[b].text;
+                                            }
+                                        }
+                                    }
                                 }
+
+                                normSlice = normalizeText(reconstructedLines);
+                                skelSlice = skeletonText(reconstructedLines);
+                                imgObj.ocrText = normSlice;
+                                imgObj.ocrNorm = normalizeSearch(reconstructedLines);
+                            } else {
+                                skelSlice = skeletonText(normSlice);
                             }
+
+                            const paddedNorm = ` ${normSlice} `;
+                            const paddedSkel = ` ${skelSlice} `;
+                            const skelWords = skelSlice.split(' ').filter(Boolean);
+                            const skelWordSet = new Set(skelWords);
+
+                            const rawMatches = [];
+                            PRECOMPILED_GLOSSARY.forEach(({ lat, candidates }) => {
+                                const matchedCand = matchSliceOCRBestCandidate(
+                                    candidates, paddedNorm, paddedSkel, normSlice, skelSlice, skelWords, skelWordSet
+                                );
+                                if (matchedCand) {
+                                    rawMatches.push({ lat, matchedCand });
+                                }
+                            });
+
+                            // Filter out nested substring matches (e.g. "sinus frontalis" inside "apertura sinus frontalis")
+                            const filteredMatches = rawMatches.filter(m =>
+                                !rawMatches.some(other =>
+                                    other.lat !== m.lat &&
+                                    other.matchedCand.length > m.matchedCand.length &&
+                                    ` ${other.matchedCand} `.includes(` ${m.matchedCand} `)
+                                )
+                            );
+
+                            let foundNewOnSlice = false;
+                            filteredMatches.forEach(({ lat }) => {
+                                if (!termLinks[lat]) termLinks[lat] = [];
+                                if (!termLinks[lat].some(l => l.plane === planeName && l.slice === sliceNum)) {
+                                    termLinks[lat].push({ plane: planeName, slice: sliceNum, source: 'ocr' });
+                                    matchedTotal++;
+                                    foundNewOnSlice = true;
+                                }
+                            });
+
+                            completedSlices++;
+                            ocrStatus.textContent = t('ocrProgress')(completedSlices, jobs.length, matchedTotal);
+                            if (foundNewOnSlice && completedSlices % 3 === 0) {
+                                renderGlossary();
+                            }
+                        } catch (sliceErr) {
+                            completedSlices++;
                         }
                     }
+                };
 
-                    const normSlice = normalizeText(reconstructedLines);
-                    const skelSlice = skeletonText(reconstructedLines);
-                    const skelWords = skelSlice.split(' ').filter(Boolean);
-                    imgObj.ocrText = normSlice;
+                await Promise.all(Array.from({ length: numWorkers }, runner));
 
-                    let foundNewOnSlice = false;
-                    PRECOMPILED_GLOSSARY.forEach(({ lat, candidates }) => {
-                        if (matchesSliceOCR(candidates, normSlice, skelSlice, skelWords)) {
-                            if (!termLinks[lat]) termLinks[lat] = [];
-                            if (!termLinks[lat].some(l => l.plane === planeName && l.slice === sliceNum)) {
-                                termLinks[lat].push({ plane: planeName, slice: sliceNum });
-                                matchedTotal++;
-                                foundNewOnSlice = true;
-                            }
-                        }
-                    });
-
-                    completedSlices++;
-                    ocrStatus.textContent = `🔍 OCR: ${completedSlices} / ${jobs.length} (${matchedTotal} links)...`;
-                    if (foundNewOnSlice && completedSlices % 3 === 0) {
-                        renderGlossary();
-                    }
-                }));
-
-                await scheduler.terminate();
+                ocrStatus.textContent = cancelOCRRequested
+                    ? t('ocrStopped')(matchedTotal)
+                    : t('ocrComplete')(matchedTotal, jobs.length);
+            } catch (err) {
+                ocrStatus.textContent = t('ocrInterrupted');
+            } finally {
+                if (scheduler) {
+                    try { await scheduler.terminate(); } catch (e) {}
+                }
                 saveTermLinks();
                 renderGlossary();
-                ocrStatus.textContent = cancelOCRRequested
-                    ? `⏹ OCR stopped (${matchedTotal} links saved).`
-                    : `✅ Complete! Linked ${matchedTotal} terms across ${jobs.length} slices.`;
-            } catch (err) {
-                ocrStatus.textContent = '⚠️ OCR interrupted.';
-            } finally {
                 isScanningOCR = false;
                 cancelOCRRequested = false;
                 ocrScanBtn.classList.remove('active');
@@ -1691,8 +2570,27 @@
             }
         });
 
-        // Glossary UI Listeners
-        searchInput.addEventListener('input', renderGlossary);
+        clearOcrBtn.addEventListener('click', () => {
+            for (const lat of Object.keys(termLinks)) {
+                termLinks[lat] = termLinks[lat].filter(l => l.source !== 'ocr');
+                if (termLinks[lat].length === 0) delete termLinks[lat];
+            }
+            PLANE_ORDER.forEach(p => {
+                planes[p].images.forEach(img => {
+                    img.ocrText = '';
+                    img.ocrNorm = '';
+                });
+            });
+            saveTermLinks();
+            renderGlossary();
+        });
+
+        // Glossary UI Listeners with Debounced Search
+        searchInput.addEventListener('input', debounce(() => {
+            jumpToSliceFromQuery(searchInput.value);
+            renderGlossary();
+        }, 150));
+
         clearSearchBtn.addEventListener('click', () => {
             searchInput.value = '';
             renderGlossary();
@@ -1720,10 +2618,12 @@
 
         exportLinksBtn.addEventListener('click', () => {
             const blob = new Blob([JSON.stringify(termLinks, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
+            a.href = url;
             a.download = 'ct_glossary_slice_links.json';
             a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
 
         importLinksBtn.addEventListener('click', () => importLinksInput.click());
@@ -1734,18 +2634,35 @@
             reader.onload = ev => {
                 try {
                     const data = JSON.parse(ev.target.result);
-                    termLinks = Object.assign({}, termLinks, data);
+                    const validated = normalizeLinksObject(data);
+                    for (const [lat, arr] of Object.entries(validated)) {
+                        (termLinks[lat] ??= []);
+                        for (const l of arr) {
+                            if (!termLinks[lat].some(x => x.plane === l.plane && x.slice === l.slice)) {
+                                termLinks[lat].push(l);
+                            }
+                        }
+                    }
                     saveTermLinks();
                     renderGlossary();
                 } catch (err) {
-                    alert('Invalid JSON file.');
+                    alert(t('alertInvalidJson'));
+                } finally {
+                    importLinksInput.value = '';
                 }
             };
             reader.readAsText(file);
         });
 
-        // Unified Input & Drag-and-Drop Listeners
+        // Unified File Input, Folder Input & Drag-and-Drop Listeners
         unifiedInput.addEventListener('change', e => {
+            if (e.target.files && e.target.files.length > 0) {
+                loadFiles(e.target.files);
+                e.target.value = '';
+            }
+        });
+
+        folderInput.addEventListener('change', e => {
             if (e.target.files && e.target.files.length > 0) {
                 loadFiles(e.target.files);
                 e.target.value = '';
@@ -1761,7 +2678,7 @@
         window.addEventListener('dragleave', e => {
             if (e.relatedTarget === null) {
                 dropOverlay.classList.remove('dragover');
-                if (planes[activePlane].images.length > 0) dropOverlay.classList.add('hidden');
+                syncOverlay();
             }
         });
 
@@ -1779,142 +2696,315 @@
 
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 await loadFiles(e.dataTransfer.files);
-            } else if (planes[activePlane].images.length > 0) {
-                dropOverlay.classList.add('hidden');
+            } else {
+                syncOverlay();
             }
         });
 
-        // Desktop Mouse Wheel & Drag (Uses stepSlice for cross-plane transitions)
+        // --- 2.3 3x Magnifying Glass (Loupe) Implementation ---
+        const LOUPE_SIZE = 184;
+        const LOUPE_RADIUS = LOUPE_SIZE / 2;
+        const LOUPE_ZOOM = 3;
+        const loupeState = {
+            active: false,
+            plane: null,
+            isTouch: false
+        };
+
+        function findPlaneAtPoint(clientX, clientY) {
+            if (!isMultiView) {
+                return planes[activePlane].images.length > 0 ? activePlane : null;
+            }
+            for (const p of PLANE_ORDER) {
+                if (planes[p].images.length === 0) continue;
+                const r = paneElements[p].pane.getBoundingClientRect();
+                if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+                    return p;
+                }
+            }
+            return null;
+        }
+
+        function getRenderedImageRect(imgEl) {
+            const rect = imgEl.getBoundingClientRect();
+            const nw = imgEl.naturalWidth || rect.width;
+            const nh = imgEl.naturalHeight || rect.height;
+            if (!nw || !nh) return rect;
+            const imgRatio = nw / nh;
+            const boxRatio = rect.width / rect.height;
+            let renderW = rect.width;
+            let renderH = rect.height;
+            let offsetX = 0;
+            let offsetY = 0;
+            if (boxRatio > imgRatio) {
+                renderW = rect.height * imgRatio;
+                offsetX = (rect.width - renderW) / 2;
+            } else {
+                renderH = rect.width / imgRatio;
+                offsetY = (rect.height - renderH) / 2;
+            }
+            return {
+                left: rect.left + offsetX,
+                top: rect.top + offsetY,
+                width: renderW,
+                height: renderH
+            };
+        }
+
+        function activateLoupe(clientX, clientY, isTouch = false) {
+            const planeUnder = findPlaneAtPoint(clientX, clientY);
+            if (!planeUnder) return false;
+            const st = planes[planeUnder];
+            if (st.images.length === 0) return false;
+
+            loupeState.active = true;
+            loupeState.plane = planeUnder;
+            loupeState.isTouch = isTouch;
+            loupeImg.src = st.images[st.index].url;
+            loupe.classList.add('visible');
+            updateLoupePosition(clientX, clientY);
+            return true;
+        }
+
+        function updateLoupePosition(clientX, clientY) {
+            if (!loupeState.active) return;
+            const planeUnder = findPlaneAtPoint(clientX, clientY) || loupeState.plane;
+            if (planeUnder && planeUnder !== loupeState.plane && planes[planeUnder].images.length > 0) {
+                loupeState.plane = planeUnder;
+                loupeImg.src = planes[planeUnder].images[planes[planeUnder].index].url;
+            }
+
+            const targetImg = paneElements[loupeState.plane].img;
+            const imgRect = getRenderedImageRect(targetImg);
+
+            const relX = clientX - imgRect.left;
+            const relY = clientY - imgRect.top;
+
+            loupeImg.style.width = `${imgRect.width * LOUPE_ZOOM}px`;
+            loupeImg.style.height = `${imgRect.height * LOUPE_ZOOM}px`;
+            loupeImg.style.left = `${LOUPE_RADIUS - relX * LOUPE_ZOOM}px`;
+            loupeImg.style.top = `${LOUPE_RADIUS - relY * LOUPE_ZOOM}px`;
+
+            // Offset upward slightly on touch so finger doesn't cover the loupe
+            const touchOffsetY = loupeState.isTouch ? -64 : 0;
+            loupe.style.left = `${clientX - LOUPE_RADIUS}px`;
+            loupe.style.top = `${clientY - LOUPE_RADIUS + touchOffsetY}px`;
+        }
+
+        function hideLoupe() {
+            loupeState.active = false;
+            loupe.classList.remove('visible');
+        }
+
+        viewport.addEventListener('contextmenu', e => {
+            e.preventDefault();
+        });
+
+        // Desktop Mouse Wheel (Accumulated Delta + Smooth Exponential Zoom) & Drag / Right-Click Loupe
+        let wheelDeltaAccum = 0;
         viewport.addEventListener('wheel', e => {
             e.preventDefault();
-            const st = planes[activePlane];
-            if (st.images.length === 0) return;
+            const hoveredPlane = findPlaneAtPoint(e.clientX, e.clientY) || activePlane;
+            if (planes[hoveredPlane].images.length === 0) return;
+
+            const normDelta = e.deltaMode === 1 ? e.deltaY * 20 : (e.deltaMode === 2 ? e.deltaY * 100 : e.deltaY);
 
             if (e.ctrlKey || e.metaKey) {
-                const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-                const newScale = Math.min(Math.max(st.scale * zoomFactor, 0.5), 15);
+                const zoomFactor = Math.exp(-normDelta * 0.002);
+                const newScale = Math.min(Math.max(viewState.scale * zoomFactor, 0.5), 15);
 
-                const rect = viewport.getBoundingClientRect();
+                const targetPaneEl = paneElements[hoveredPlane].pane;
+                const rect = targetPaneEl.getBoundingClientRect();
                 const cursorX = e.clientX - rect.left - rect.width / 2;
                 const cursorY = e.clientY - rect.top - rect.height / 2;
 
-                st.panX = cursorX - (cursorX - st.panX) * (newScale / st.scale);
-                st.panY = cursorY - (cursorY - st.panY) * (newScale / st.scale);
-                st.scale = newScale;
+                viewState.panX = cursorX - (cursorX - viewState.panX) * (newScale / viewState.scale);
+                viewState.panY = cursorY - (cursorY - viewState.panY) * (newScale / viewState.scale);
+                viewState.scale = newScale;
 
                 updateTransform();
+                if (loupeState.active) updateLoupePosition(e.clientX, e.clientY);
             } else {
                 stopPlay();
-                const step = e.deltaY > 0 ? 1 : -1;
-                stepSlice(step);
+                wheelDeltaAccum += normDelta;
+                const STEP_THRESHOLD = 45;
+                if (Math.abs(wheelDeltaAccum) >= STEP_THRESHOLD) {
+                    const steps = Math.trunc(wheelDeltaAccum / STEP_THRESHOLD);
+                    wheelDeltaAccum -= steps * STEP_THRESHOLD;
+                    stepSlice(steps, isMultiView ? hoveredPlane : null);
+                    if (loupeState.active) updateLoupePosition(e.clientX, e.clientY);
+                }
             }
         }, { passive: false });
 
         viewport.addEventListener('mousedown', e => {
+            if (e.target.closest('.pane-footer') || e.target.closest('.drop-overlay')) return;
+
+            if (e.button === 2) {
+                e.preventDefault();
+                activateLoupe(e.clientX, e.clientY, false);
+                return;
+            }
+
             if (e.button !== 0 && e.button !== 1) return;
-            const st = planes[activePlane];
-            if (st.images.length === 0) return;
+            if (!hasAnyLoadedSlices()) return;
             isDragging = true;
-            startX = e.clientX - st.panX;
-            startY = e.clientY - st.panY;
+            startX = e.clientX - viewState.panX;
+            startY = e.clientY - viewState.panY;
             viewport.classList.add('dragging');
         });
 
         window.addEventListener('mousemove', e => {
+            if (loupeState.active && !loupeState.isTouch) {
+                updateLoupePosition(e.clientX, e.clientY);
+            }
             if (!isDragging) return;
-            const st = planes[activePlane];
-            st.panX = e.clientX - startX;
-            st.panY = e.clientY - startY;
+            viewState.panX = e.clientX - startX;
+            viewState.panY = e.clientY - startY;
             updateTransform();
         });
 
-        window.addEventListener('mouseup', () => {
+        window.addEventListener('mouseup', e => {
+            if (e.button === 2 && loupeState.active) {
+                hideLoupe();
+            }
             isDragging = false;
             viewport.classList.remove('dragging');
         });
 
-        // Mobile Touch Gestures (Uses incremental stepSlice for cross-plane swipe)
+        window.addEventListener('blur', hideLoupe);
+
+        // Mobile Touch Gestures (Double-Tap without swipe conflict + Long-Press 3x Loupe)
         let touchMode = null;
         let touchStartX = 0;
         let touchStartY = 0;
         let touchStartPanX = 0;
         let touchStartPanY = 0;
+        let touchMoved = false;
         let lastSwipeStep = 0;
         let initialPinchDist = 0;
         let initialPinchScale = 1;
-        let lastTapTime = 0;
+        let lastCleanTapTime = 0;
+        let longPressTimer = null;
+
+        function clearLongPressTimer() {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
 
         function getTouchDistance(t1, t2) {
             return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
         }
 
         viewport.addEventListener('touchstart', e => {
-            const st = planes[activePlane];
-            if (st.images.length === 0) return;
+            if (e.target.closest('.pane-footer') || e.target.closest('.drop-overlay')) return;
+            if (!hasAnyLoadedSlices()) return;
+
+            clearLongPressTimer();
 
             if (e.touches.length === 1) {
-                const now = Date.now();
-                if (now - lastTapTime < 280) {
-                    st.scale = st.scale > 1.2 ? 1 : 2.5;
-                    if (st.scale === 1) { st.panX = 0; st.panY = 0; }
-                    updateTransform();
-                    lastTapTime = 0;
-                    return;
-                }
-                lastTapTime = now;
-
                 touchMode = 'single';
+                touchMoved = false;
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
-                touchStartPanX = st.panX;
-                touchStartPanY = st.panY;
+                touchStartPanX = viewState.panX;
+                touchStartPanY = viewState.panY;
                 lastSwipeStep = 0;
+
+                // Long-press (~320ms) activates 3x Magnifying Glass on mobile
+                longPressTimer = setTimeout(() => {
+                    if (touchMode === 'single' && !touchMoved) {
+                        if (activateLoupe(touchStartX, touchStartY, true)) {
+                            touchMode = 'loupe';
+                        }
+                    }
+                }, 320);
             } else if (e.touches.length === 2) {
+                hideLoupe();
                 touchMode = 'pinch';
+                touchMoved = true;
                 initialPinchDist = getTouchDistance(e.touches[0], e.touches[1]);
-                initialPinchScale = st.scale;
+                initialPinchScale = viewState.scale;
                 touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                touchStartPanX = st.panX;
-                touchStartPanY = st.panY;
+                touchStartPanX = viewState.panX;
+                touchStartPanY = viewState.panY;
             }
         }, { passive: false });
 
         viewport.addEventListener('touchmove', e => {
-            const st = planes[activePlane];
-            if (st.images.length === 0) return;
+            if (!touchMode || !hasAnyLoadedSlices()) return;
             e.preventDefault();
 
+            if (touchMode === 'loupe' && e.touches.length === 1) {
+                updateLoupePosition(e.touches[0].clientX, e.touches[0].clientY);
+                return;
+            }
+
             if (touchMode === 'pinch' && e.touches.length === 2) {
+                clearLongPressTimer();
                 const dist = getTouchDistance(e.touches[0], e.touches[1]);
                 const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
-                st.scale = Math.min(Math.max(initialPinchScale * (dist / initialPinchDist), 0.5), 12);
-                st.panX = touchStartPanX + (midX - touchStartX);
-                st.panY = touchStartPanY + (midY - touchStartY);
+                viewState.scale = Math.min(Math.max(initialPinchScale * (dist / initialPinchDist), 0.5), 12);
+                viewState.panX = touchStartPanX + (midX - touchStartX);
+                viewState.panY = touchStartPanY + (midY - touchStartY);
                 updateTransform();
             } else if (touchMode === 'single' && e.touches.length === 1) {
                 const dx = e.touches[0].clientX - touchStartX;
                 const dy = e.touches[0].clientY - touchStartY;
 
-                if (st.scale > 1.05 || Math.abs(st.panX) > 5 || Math.abs(st.panY) > 5) {
-                    st.panX = touchStartPanX + dx;
-                    st.panY = touchStartPanY + dy;
+                if (Math.hypot(dx, dy) > 10) {
+                    touchMoved = true;
+                    clearLongPressTimer();
+                }
+
+                if (viewState.scale > 1.05 || Math.abs(viewState.panX) > 5 || Math.abs(viewState.panY) > 5) {
+                    viewState.panX = touchStartPanX + dx;
+                    viewState.panY = touchStartPanY + dy;
                     updateTransform();
-                } else {
+                } else if (touchMoved) {
                     stopPlay();
                     const currentSwipeStep = Math.round(dy / 14);
                     const delta = currentSwipeStep - lastSwipeStep;
                     if (delta !== 0) {
-                        stepSlice(delta);
+                        stepSlice(delta, isMultiView ? activePlane : null);
                         lastSwipeStep = currentSwipeStep;
                     }
                 }
             }
         }, { passive: false });
 
-        viewport.addEventListener('touchend', () => {
+        viewport.addEventListener('touchend', e => {
+            clearLongPressTimer();
+            if (touchMode === 'loupe') {
+                hideLoupe();
+                touchMode = null;
+                return;
+            }
+            if (touchMode === 'single' && !touchMoved && e.changedTouches.length === 1) {
+                const now = Date.now();
+                if (now - lastCleanTapTime < 280) {
+                    viewState.scale = viewState.scale > 1.2 ? 1 : 2.5;
+                    if (viewState.scale === 1) {
+                        viewState.panX = 0;
+                        viewState.panY = 0;
+                    }
+                    updateTransform();
+                    lastCleanTapTime = 0;
+                } else {
+                    lastCleanTapTime = now;
+                }
+            }
+            touchMode = null;
+        });
+
+        viewport.addEventListener('touchcancel', () => {
+            clearLongPressTimer();
+            hideLoupe();
             touchMode = null;
         });
 
@@ -1933,30 +3023,34 @@
         });
 
         zoomInBtn.addEventListener('click', () => {
-            const st = planes[activePlane];
-            st.scale = Math.min(st.scale * 1.25, 15);
+            viewState.scale = Math.min(viewState.scale * 1.25, 15);
             updateTransform();
         });
 
         zoomOutBtn.addEventListener('click', () => {
-            const st = planes[activePlane];
-            st.scale = Math.max(st.scale / 1.25, 0.5);
+            viewState.scale = Math.max(viewState.scale / 1.25, 0.5);
             updateTransform();
         });
 
         brightnessRange.addEventListener('input', e => {
-            brightness = e.target.value;
+            brightness = Number(e.target.value);
             updateFilters();
         });
 
         contrastRange.addEventListener('input', e => {
-            contrast = e.target.value;
+            contrast = Number(e.target.value);
             updateFilters();
         });
 
         invertBtn.addEventListener('click', () => {
             inverted = !inverted;
             invertBtn.classList.toggle('active', inverted);
+            updateFilters();
+        });
+
+        pixelatedBtn.addEventListener('click', () => {
+            isPixelated = !isPixelated;
+            pixelatedBtn.classList.toggle('active', isPixelated);
             updateFilters();
         });
 
@@ -1977,11 +3071,23 @@
                 return;
             }
 
+            // Do not hijack arrow keys when adjusting brightness/contrast or pane sliders
+            if (
+                document.activeElement &&
+                document.activeElement.tagName === 'INPUT' &&
+                document.activeElement.type === 'range' &&
+                document.activeElement !== sliceSlider
+            ) {
+                return;
+            }
+
             if (e.key === '1') { stopPlay(); switchPlane('axial'); return; }
             if (e.key === '2') { stopPlay(); switchPlane('coronal'); return; }
             if (e.key === '3') { stopPlay(); switchPlane('sagittal'); return; }
+            if (e.key === '4') { setMultiView(!isMultiView); return; }
 
             if (e.key === ' ') {
+                if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
                 e.preventDefault();
                 togglePlay();
                 return;
@@ -2017,10 +3123,10 @@
             } else if (e.key === 'r' || e.key === 'R') {
                 resetView();
             } else if (e.key === '+' || e.key === '=') {
-                st.scale = Math.min(st.scale * 1.2, 15);
+                viewState.scale = Math.min(viewState.scale * 1.2, 15);
                 updateTransform();
             } else if (e.key === '-') {
-                st.scale = Math.max(st.scale / 1.2, 0.5);
+                viewState.scale = Math.max(viewState.scale / 1.2, 0.5);
                 updateTransform();
             }
         });
