@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CT Viewer & Anatomical Glossary</title>
     <style>
         /* Night Theme (Default) */
@@ -74,6 +74,10 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        html, body {
+            overscroll-behavior: none;
+        }
+
         body {
             background-color: var(--bg-dark);
             color: var(--text-main);
@@ -83,7 +87,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            touch-action: none;
+            touch-action: manipulation;
             transition: background-color 0.2s, color 0.2s;
         }
 
@@ -92,6 +96,7 @@
             background-color: var(--panel-bg);
             border-bottom: 1px solid var(--panel-border);
             padding: 8px 12px;
+            padding-top: calc(8px + env(safe-area-inset-top, 0px));
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -228,6 +233,37 @@
             width: 65px;
             accent-color: var(--accent);
             cursor: pointer;
+            touch-action: pan-x;
+        }
+
+        .mobile-only {
+            display: none !important;
+        }
+
+        /* Mobile Brightness/Contrast Popover Bar */
+        .mobile-adjust-bar {
+            display: none;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 6px 12px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 28;
+        }
+
+        .mobile-adjust-bar.visible {
+            display: flex;
+        }
+
+        .mobile-adjust-bar .control-item {
+            flex: 1;
+            justify-content: space-between;
+        }
+
+        .mobile-adjust-bar input[type="range"] {
+            width: 100%;
+            flex: 1;
         }
 
         /* Workspace */
@@ -354,6 +390,7 @@
             transform-origin: center center;
             pointer-events: none;
             display: none;
+            will-change: transform;
         }
 
         .slice-img.pixelated {
@@ -369,6 +406,7 @@
             align-items: center;
             gap: 6px;
             z-index: 6;
+            touch-action: pan-x;
         }
 
         .panes-grid.mode-3x .pane-footer {
@@ -380,6 +418,7 @@
             accent-color: var(--accent);
             height: 6px;
             cursor: pointer;
+            touch-action: pan-x;
         }
 
         /* 3x Magnifying Glass (Loupe) */
@@ -524,14 +563,21 @@
             gap: 8px;
         }
 
-        .search-box {
+        .search-row {
             display: flex;
+            align-items: center;
             gap: 6px;
+        }
+
+        .search-box {
+            flex: 1;
+            display: flex;
             position: relative;
         }
 
         .search-input {
             flex: 1;
+            width: 100%;
             background: var(--input-bg);
             border: 1px solid var(--input-border);
             color: var(--text-main);
@@ -541,6 +587,7 @@
             outline: none;
             user-select: text;
             -webkit-user-select: text;
+            touch-action: manipulation;
         }
 
         .search-input:focus {
@@ -617,6 +664,8 @@
         .glossary-list {
             flex: 1;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
             padding: 6px 8px;
             display: flex;
             flex-direction: column;
@@ -758,10 +807,12 @@
             background-color: var(--panel-bg);
             border-top: 1px solid var(--panel-border);
             padding: 8px 14px;
+            padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
             display: flex;
             align-items: center;
             gap: 10px;
             z-index: 30;
+            touch-action: pan-x;
         }
 
         .slice-counter {
@@ -778,6 +829,7 @@
             accent-color: var(--accent);
             height: 8px;
             cursor: pointer;
+            touch-action: pan-x;
         }
 
         input[type="file"] {
@@ -788,16 +840,43 @@
         @media (max-width: 820px) {
             .toolbar {
                 padding: 6px 8px;
-                gap: 6px;
+                padding-top: calc(6px + env(safe-area-inset-top, 0px));
+                gap: 5px;
+            }
+
+            .toolbar-group {
+                gap: 4px;
+            }
+
+            .title {
+                display: none;
             }
 
             .desktop-only {
                 display: none !important;
             }
 
+            .mobile-only {
+                display: inline-flex !important;
+            }
+
+            .plane-tab {
+                padding: 5px 7px;
+                font-size: 11.5px;
+            }
+
+            .btn {
+                padding: 5px 8px;
+                font-size: 11.5px;
+            }
+
             .panes-grid.mode-3x {
                 grid-template-columns: 1fr;
                 grid-template-rows: repeat(3, 1fr);
+            }
+
+            .panes-grid.mode-3x .pane-footer {
+                padding: 3px 8px;
             }
 
             .sidebar {
@@ -806,15 +885,32 @@
                 right: 0;
                 bottom: 0;
                 width: 100%;
-                height: 68%;
+                height: 72%;
                 border-left: none;
                 border-top: 2px solid var(--accent);
                 border-radius: 14px 14px 0 0;
-                box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 -8px 25px rgba(0, 0, 0, 0.55);
+            }
+
+            /* Prevents iOS Safari from auto-zooming the page when focusing the search input */
+            .search-input {
+                font-size: 16px;
+                padding: 7px 30px 7px 10px;
+            }
+
+            .pill-btn, .pin-btn {
+                padding: 5px 9px;
+                font-size: 11.5px;
+            }
+
+            .slice-badge {
+                padding: 4px 8px;
+                font-size: 12px;
             }
 
             .bottom-bar {
                 padding: 10px 10px;
+                padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
                 gap: 8px;
             }
 
@@ -823,7 +919,7 @@
             }
 
             .slice-counter {
-                min-width: 90px;
+                min-width: 86px;
                 font-size: 12px;
             }
         }
@@ -880,6 +976,7 @@
                 <input type="range" id="contrastRange" min="30" max="250" value="100">
             </div>
 
+            <button type="button" class="btn mobile-only" id="mobileAdjustBtn" title="Brightness & Contrast">☀️/◐</button>
             <button type="button" class="btn" id="invertBtn">Invert</button>
             <button type="button" class="btn" id="pixelatedBtn" title="Crisp Pixel Rendering">🏁 Pixel</button>
             <button type="button" class="btn" id="resetBtn">Reset</button>
@@ -893,6 +990,18 @@
             </div>
 
             <button type="button" class="btn active" id="toggleGlossaryBtn">📖 Glossary</button>
+        </div>
+    </div>
+
+    <!-- Collapsible Brightness & Contrast Bar for Mobile Devices -->
+    <div class="mobile-adjust-bar" id="mobileAdjustBar">
+        <div class="control-item">
+            <span>☀️</span>
+            <input type="range" id="brightnessRangeMobile" min="30" max="250" value="100">
+        </div>
+        <div class="control-item">
+            <span>◐</span>
+            <input type="range" id="contrastRangeMobile" min="30" max="250" value="100">
         </div>
     </div>
 
@@ -967,9 +1076,12 @@
 
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <div class="search-box">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search Latin, Eesti, Русский or #slice...">
-                    <button type="button" class="clear-search" id="clearSearchBtn">✕</button>
+                <div class="search-row">
+                    <div class="search-box">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search Latin, Eesti, Русский or #slice...">
+                        <button type="button" class="clear-search" id="clearSearchBtn">✕</button>
+                    </div>
+                    <button type="button" class="btn mobile-only" id="closeSidebarMobileBtn" aria-label="Close Glossary">✕</button>
                 </div>
                 <div class="sidebar-meta">
                     <span id="termCountLabel">0 terms</span>
@@ -999,7 +1111,7 @@
     </div>
 
     <script>
-        const RAW_GLOSSARY_DATA = [["Adhaesio interthalamica", "Talamustevaheline liide", "Межталамическое сращение"], ["Ala major", "Suur tiib (kiilluu suur tiib)", "Большое крыло (клиновидной кости)"], ["Ala minor", "Väike tiib (kiilluu väike tiib)", "Малое крыло (клиновидной кости)"], ["Ala nasi", "Ninatiib", "Крыло носа"], ["Angulus pontocerebellaris", "Silla-väikeaju nurk", "Мостомозжечковый угол"], ["Anulus tympanicus", "Trummivõru", "Барабанное кольцо"], ["Apertura ductus nasolacrimalis", "Nina-pisarajuha avaus", "Апертура носослёзного протока"], ["Apertura externa canalis carotidis", "Unearterikanali välimine avaus", "Наружная апертура сонного канала"], ["Apertura interna canalis carotidis", "Unearterikanali sisemine avaus", "Внутренняя апертура сонного канала"], ["Apertura lateralis ventriculi quarti", "Neljanda vatsakese külgmine avaus (Luschka ava)", "Латеральная апертура четвёртого желудочка"], ["Apertura mediana ventriculi quarti", "Neljanda vatsakese keskmine avaus (Magendie ava)", "Срединная апертура четвёртого желудочка"], ["Apertura sinus frontalis", "Otsmikusiinuse avaus", "Апертура лобной пазухи"], ["Apertura sinus ossis sphenoidei", "Kiilluusiinuse avaus", "Апертура клиновидной пазухи"], ["Apex partis petrosae", "Kaljuosa tipp", "Верхушка каменистой части"], ["Aquaeductus mesencephali", "Keskaju veejuha", "Водопровод среднего мозга"], ["Arcus anterior atlantis", "Kandelüli eesmine kaar", "Передняя дуга атланта"], ["Arcus posterior atlantis", "Kandelüli tagumine kaar", "Задняя дуга атланта"], ["Arcus superciliaris", "Kulmukaar", "Надбровная дуга"], ["Arcus zygomaticus", "Sarnakaar", "Скуловая дуга"], ["Arteria basilaris", "Basilaararter (põhimikuarter)", "Базилярная артерия"], ["Arteria cerebri anterior: Pars postcommunicalis; Segmentum A2 [A2]", "Eesmine ajuarter: ühendusejärgne osa (A2-segment)", "Передняя мозговая артерия: посткоммуникационная часть (сегмент А2)"], ["Arteria cerebri anterior: Pars precommunicalis; Segmentum A1 [A1]", "Eesmine ajuarter: ühenduseelne osa (A1-segment)", "Передняя мозговая артерия: предкоммуникационная часть (сегмент А1)"], ["Arteria cerebri media: Pars insularis; Segmentum M2 [M2]", "Keskmine ajuarter: saareosa (M2-segment)", "Средняя мозговая артерия: островковая часть (сегмент M2)"], ["Arteria cerebri media: Pars sphenoidalis; Pars horizontalis; Segmentum M1 [M1]", "Keskmine ajuarter: kiilluuosa / horisontaalosa (M1-segment)", "Средняя мозговая артерия: клиновидная / горизонтальная часть (сегмент М1)"], ["Arteria cerebri posterior: Pars postcommunicalis; Segmentum P2 [P2]", "Tagumine ajuarter: ühendusejärgne osa (P2-segment)", "Задняя мозговая артерия: посткоммуникационная часть (сегмент Р2)"], ["Arteria cerebri posterior: Pars precommunicalis; Segmentum P1 [P1]", "Tagumine ajuarter: ühenduseelne osa (P1-segment)", "Задняя мозговая артерия: предкоммуникационная часть (сегмент Р1)"], ["Arteria communicans anterior", "Eesmine ühendusarter", "Передняя соединительная артерия"], ["Arteria communicans posterior", "Tagumine ühendusarter", "Задняя соединительная артерия"], ["Arteria inferior posterior cerebelli", "Väikeaju alumine tagumine arter", "Задняя нижняя мозжечковая артерия"], ["Arteria superior cerebelli", "Väikeaju ülemine arter", "Верхняя мозжечковая артерия"], ["Arteria vertebralis: Segmentum extraduralis; Segmentum atlanticum (V3) [V3]", "Selgrooarter: kõvakestaväline / kandelüliosa (V3-segment)", "Позвоночная артерия: экстрадуральный / атлантовый сегмент (V3)"], ["Arteria vertebralis: Segmentum foraminalis (V2) [V2]", "Selgrooarter: ristijätkemulkude osa (V2-segment)", "Позвоночная артерия: фораминальный сегмент (V2)"], ["Arteria vertebralis: Segmentum intraduralis; Segmentum intracranialis (V4) [V4]", "Selgrooarter: kõvakestasisene / koljusisene osa (V4-segment)", "Позвоночная артерия: интрадуральный / внутричерепной сегмент (V4)"], ["Articulatio atlantoaxialis mediana", "Keskmine kande-telglüliliiges", "Срединный атлантоосевой сустав"], ["Articulatio atlantooccipitalis", "Kandelüli-kuklaluuliiges", "Атлантозатылочный сустав"], ["Articulatio temporomandibularis", "Alalõualiiges", "Височно-нижнечелюстной сустав"], ["Atlas", "Kandelüli (atlas)", "Атлант (первый шейный позвонок)"], ["Atrium meatus medii", "Keskmise ninakäigu esik (aatrium)", "Преддверие среднего носового хода"], ["Atrium ventriculi lateralis", "Külgvatsakese kolmnurk (aatrium)", "Преддверие (треугольник) бокового желудочка"], ["Auris", "Kõrv", "Ухо"], ["Axis", "Telglüli (aksis)", "Осевой позвонок (аксис)"], ["Basis cranii", "Koljupõhimik", "Основание черепа"], ["Bucca", "Põsk", "Щека"], ["Bulla ethmoidea", "Sõelluupõis", "Решётчатый пузырёк"], ["Bulla ethmoidea ossea", "Luuline sõelluupõis", "Костный решётчатый пузырёк"], ["Calcar avis", "Kukekannus", "Птичья шпора"], ["Calvaria", "Koljuvõlv", "Свод черепа"], ["Canales diploici", "Diploekanalid", "Диплоические каналы"], ["Canales incisivi", "Lõikehambakanalid", "Резцовые каналы"], ["Canalis carotidis", "Unearterikanal", "Сонный канал"], ["Canalis condylaris", "Põndakanal", "Мыщелковый канал"], ["Canalis facialis", "Näonärvikanal", "Лицевой канал"], ["Canalis hypoglossus", "Keelealuse närvi kanal", "Подъязычный канал"], ["Canalis infraorbitalis", "Silmakoopaalune kanal", "Подглазничный канал"], ["Canalis mandibulae", "Alalõuakanal", "Канал нижней челюсти"], ["Canalis musculotubarius", "Lihase-kuulmetõri kanal", "Мышечно-трубный канал"], ["Canalis nasolacrimalis", "Nina-pisarakanal", "Носослёзный канал"], ["Canalis opticus", "Nägemisnärvikanal", "Зрительный канал"], ["Canalis palatinus major", "Suur suulaekanal", "Большой нёбный канал"], ["Canalis pterygoideus", "Tiibjätkekanal", "Крыловидный канал"], ["Capsula interna", "Sisemine kihn", "Внутренняя капсула"], ["Caput", "Pea", "Голова"], ["Caput nuclei caudati", "Sabatuuma pea", "Головка хвостатого ядра"], ["Cauda nuclei caudati", "Sabatuuma saba", "Хвост хвостатого ядра"], ["Cavitas cranii", "Koljuõõs", "Полость черепа"], ["Cavitas orbitae", "Silmakoobas", "Глазница (полость глазницы)"], ["Cavitas oris", "Suuõõs", "Полость рта"], ["Cavitas tympani cranii", "Trummiõõs", "Барабанная полость"], ["Cavum trigeminale", "Kolmiknärviõõs", "Тройничная полость"], ["Cellulae ethmoideae anteriores", "Eesmised sõelluurakud", "Передние решётчатые ячейки"], ["Cellulae ethmoideae mediae", "Keskmised sõelluurakud", "Средние решётчатые ячейки"], ["Cellulae ethmoideae posteriores", "Tagumised sõelluurakud", "Задние решётчатые ячейки"], ["Cerebellum", "Väikeaju", "Мозжечок"], ["Chiasma opticum", "Nägemisristmik", "Зрительный перекрёст"], ["Choana", "Tagasõõre (koaan)", "Хоана"], ["Choana cranii", "Kolju tagasõõre (koaan)", "Хоана черепа"], ["Circulus arteriosus cerebri", "Suuraju arteriaalring (Willise ring)", "Артериальный круг большого мозга"], ["Clivus", "Nõlv (kliivus)", "Скат"], ["Collum", "Kael", "Шея"], ["Collum mandibulae", "Alalõuakael", "Шейка нижней челюсти"], ["Commissura anterior", "Eesmine komissuur", "Передняя спайка"], ["Commissura posterior", "Tagumine komissuur", "Задняя спайка"], ["Concha inferior nasi", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha media nasi", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis inferior", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha nasalis media", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis superior", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Concha superior nasi", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Condylus mandibulae", "Alalõuapõnt (alalõuapea)", "Мыщелок (головка) нижней челюсти"], ["Condylus occipitalis", "Kuklapõnt", "Затылочный мыщелок"], ["Confluens sinuum", "Siinuste ühinemiskoht", "Сток синусов"], ["Cornu frontale", "Otsmikusarv (eesmine sarv)", "Лобный (передний) рог"], ["Cornu occipitale", "Kuklasarv (tagumine sarv)", "Затылочный (задний) рог"], ["Cornu temporale", "Oimusarv (alumine sarv)", "Височный (нижний) рог"], ["Corona radiata", "Kiirtepärg", "Лучистый венец"], ["Corpus adiposum buccae", "Põse rasvkeha", "Жировое тело щеки"], ["Corpus nuclei caudati", "Sabatuuma keha", "Тело хвостатого ядра"], ["Corpus ossis sphenoidei", "Kiilluu keha", "Тело клиновидной кости"], ["Cranium", "Kolju", "Череп"], ["Crista frontalis", "Otsmikuhari", "Лобный гребень"], ["Crista galli", "Kukehari", "Петушиный гребень"], ["Crista lacrimalis posterior", "Tagumine pisarahari", "Задний слёзный гребень"], ["Crista nasalis maxillae", "Ülalõualuu ninahari", "Носовой гребень верхней челюсти"], ["Crista nasalis ossis palatini", "Suulaeluu ninahari", "Носовой гребень нёбной кости"], ["Crista occipitalis externa", "Välimine kuklahari", "Наружный затылочный гребень"], ["Crista occipitalis interna", "Sisemine kuklahari", "Внутренний затылочный гребень"], ["Crista sphenoidea", "Kiilluuhari", "Клиновидный гребень"], ["Dens axis", "Telglüli hammas", "Зуб осевого позвонка"], ["Dentes", "Hambad", "Зубы"], ["Diaphragma sellae", "Sadulavahelihas (saduladiafragma)", "Диафрагма седла"], ["Diencephalon", "Vaheaju", "Промежуточный мозг"], ["Diploe", "Diploe", "Диплоэ"], ["Dorsum nasi", "Ninaselg", "Спинка носа"], ["Dorsum sellae", "Sadulaselg", "Спинка седла"], ["Encephalon", "Peaaju", "Головной мозг"], ["Facies", "Nägu", "Лицо"], ["Facies anterior maxillae", "Ülalõualuu eesmine pind", "Передняя поверхность верхней челюсти"], ["Facies articularis superior atlantis", "Kandelüli ülemine liigesepind", "Верхняя суставная поверхность атланта"], ["Facies infratemporalis maxillae", "Ülalõualuu oimualune pind", "Подвисочная поверхность верхней челюсти"], ["Facies nasalis maxillae", "Ülalõualuu ninapind", "Носовая поверхность верхней челюсти"], ["Facies orbitalis maxillae", "Ülalõualuu silmakoopapind", "Глазничная поверхность верхней челюсти"], ["Falx cerebelli", "Väikeajusirp", "Серп мозжечка"], ["Falx cerebri", "Suurajusirp", "Серп большого мозга"], ["Fissura chorioidea", "Soonpõimikulõhe", "Сосудистая щель"], ["Fissura orbitalis inferior", "Alumine silmakoopalõhe", "Нижняя глазничная щель"], ["Fissura orbitalis superior", "Ülemine silmakoopalõhe", "Верхняя глазничная щель"], ["Flocculus [H X]", "Flokulus (väikeajututt) [H X]", "Клочок мозжечка [Н Х]"], ["Foramen alveolare inferius", "Alalõuamulk", "Нижнее альвеолярное отверстие (отверстие нижней челюсти)"], ["Foramen caecum ossis frontalis", "Otsmikuluu umbmulk", "Слепое отверстие лобной кости"], ["Foramen infraorbitale", "Silmakoopaalune mulk", "Подглазничное отверстие"], ["Foramen interventriculare", "Vatsakestevaheline mulk", "Межжелудочковое отверстие"], ["Foramen jugulare", "Kägimulk", "Яремное отверстие"], ["Foramen lacerum", "Rebimulk", "Рваное отверстие"], ["Foramen magnum", "Suur kuklamulk", "Большое (затылочное) отверстие"], ["Foramen mastoideum", "Nibujätkemulk", "Сосцевидное отверстие"], ["Foramen ovale", "Ovaalmulk", "Овальное отверстие"], ["Foramen palatinum majus", "Suur suulaemulk", "Большое нёбное отверстие"], ["Foramen parietale", "Kiiruluumulk", "Теменное отверстие"], ["Foramen rotundum", "Ümarmulk", "Круглое отверстие"], ["Foramen sphenopalatinum", "Kiilluu-suulaemulk", "Клиновидно-нёбное отверстие"], ["Foramen spinosum", "Ogamulk", "Остистое отверстие"], ["Foramen stylomastoideum", "Tikkel-nibujätkemulk", "Шилососцевидное отверстие"], ["Foramen transversarium", "Ristijätkemulk", "Поперечное отверстие"], ["Fornix", "Ajukaar (võlv)", "Свод"], ["Fossa anterior cranii", "Eesmine koljuauk", "Передняя черепная ямка"], ["Fossa condylaris", "Põndaauk", "Мыщелковая ямка"], ["Fossa incisiva", "Lõikehambaauk", "Резцовая ямка"], ["Fossa jugularis", "Kägiauk", "Яремная ямка"], ["Fossa mandibularis", "Alalõuaauk", "Нижнечелюстная ямка"], ["Fossa media cranii", "Keskmine koljuauk", "Средняя черепная ямка"], ["Fossa posterior cranii", "Tagumine koljuauk", "Задняя черепная ямка"], ["Fossa pterygoidea", "Tiibjätkeauk", "Крыловидная ямка"], ["Fossa scaphoidea", "Lootsikauk (paatjas auk)", "Ладьевидная ямка"], ["Fossula petrosa", "Kaljulohuke", "Каменистая ямочка"], ["Fovea pterygoidea", "Tiibjätkelohk", "Крыловидная ямка (нижней челюсти)"], ["Foveolae granulares", "Granulatsioonilohukesed", "Ямочки грануляций"], ["Frons cranii", "Otsmik (laup)", "Лоб"], ["Genu corporis callosi", "Mõhnkeha põlv", "Колено мозолистого тела"], ["Gingiva", "Ige", "Десна"], ["Glabella", "Kulmudevahe (glabella)", "Глабелла (надпереносье)"], ["Glandula parotidea", "Kõrvasüljenääre", "Околоушная слюнная железа"], ["Glandula pinealis", "Käbikeha (epifüüs)", "Шишковидное тело (эпифиз)"], ["Granulationes arachnoideae", "Ämblikuvõrkkesta granulatsioonid", "Грануляции паутинной оболочки"], ["Hamulus pterygoideus", "Tiibjätkekonks", "Крыловидный крючок"], ["Hemisphaerium cerebelli", "Väikeaju poolkera", "Полушарие мозжечка"], ["Hemisphaerium cerebri", "Suuraju poolkera", "Полушарие большого мозга"], ["Hiatus maxillae", "Ülalõuaurkehaigutus", "Расщелина верхнечелюстной пазухи"], ["Hypophysis", "Ajuripats (hüpofüüs)", "Гипофиз"], ["Hypothalamus", "Hüpotalamus", "Гипоталамус"], ["Incisura jugularis ossis occipitalis", "Kuklaluu kägisälk", "Яремная вырезка затылочной кости"], ["Incisura jugularis ossis temporalis", "Oimuluu kägisälk", "Яремная вырезка височной кости"], ["Incisura mandibulae", "Alalõuasälk", "Вырезка нижней челюсти"], ["Incisura mastoidea", "Nibujätkesälk", "Сосцевидная вырезка"], ["Incisura pterygoidea", "Tiibjätkesälk", "Крыловидная вырезка"], ["Incisura supraorbitalis", "Silmakoopaülene sälk", "Надглазничная вырезка"], ["Incisura tentorii", "Väikeajutelgi sälk", "Вырезка намёта мозжечка"], ["Infundibulum ethmoideum", "Sõelluulehter", "Решётчатая воронка"], ["Infundibulum ethmoideum osseum", "Luuline sõelluulehter", "Костная решётчатая воронка"], ["Insula", "Saar (Reili saar)", "Островок (островковая доля)"], ["Jugum sphenoideum", "Kiilluuike", "Клиновидное возвышение"], ["Labium superius oris", "Ülahuul", "Верхняя губа"], ["Labyrinthus ethmoideus", "Sõelluulabürint", "Решётчатый лабиринт"], ["Lamina cribrosa", "Sõellest", "Решётчатая пластинка"], ["Lamina horizontalis ossis palatini", "Suulaeluu rõhtlest", "Горизонтальная пластинка нёбной кости"], ["Lamina lateralis processus pterygoidei", "Tiibjätke külgmine lest", "Латеральная пластинка крыловидного отростка"], ["Lamina medialis processus pterygoidei", "Tiibjätke keskmine lest", "Медиальная пластинка крыловидного отростка"], ["Lamina orbitalis labyrinthi ethmoidei", "Sõelluulabürindi silmakoopalest", "Глазничная пластинка решётчатого лабиринта"], ["Lamina perpendicularis ossis ethmoidei", "Sõelluu püstlest", "Перпендикулярная пластинка решётчатой кости"], ["Lamina perpendicularis ossis palatini", "Suulaeluu püstlest", "Перпендикулярная пластинка нёбной кости"], ["Lingua", "Keel", "Язык"], ["Lobus anterior cerebelli", "Väikeaju eesmine sagar", "Передняя доля мозжечка"], ["Lobus frontalis", "Otsmikusagar", "Лобная доля"], ["Lobus occipitalis", "Kuklasagar", "Затылочная доля"], ["Lobus parietalis", "Kiirusagar", "Теменная доля"], ["Lobus posterior cerebelli", "Väikeaju tagumine sagar", "Задняя доля мозжечка"], ["Lobus temporalis", "Oimusagar", "Височная доля"], ["Margo infraorbitalis", "Silmakoopa alumine serv", "Подглазничный край"], ["Margo lateralis orbitae", "Silmakoopa külgmine serv", "Латеральный край глазницы"], ["Margo medialis orbitae", "Silmakoopa keskmine serv", "Медиальный край глазницы"], ["Margo supraorbitalis", "Silmakoopa ülemine serv", "Надглазничный край"], ["Massa lateralis atlantis", "Kandelüli külgmass", "Латеральная масса атланта"], ["Maxilla", "Ülalõualuu", "Верхняя челюсть"], ["Meatus acusticus externus cranii", "Välimine kuulmekäik", "Наружный слуховой проход"], ["Meatus acusticus internus", "Sisemine kuulmekäik", "Внутренний слуховой проход"], ["Meatus communis nasi", "Ühine ninakäik", "Общий носовой ход"], ["Meatus inferior nasi", "Alumine ninakäik", "Нижний носовой ход"], ["Meatus medius nasi", "Keskmine ninakäik", "Средний носовой ход"], ["Meatus nasalis communis cranii", "Ühine ninakäik (koljus)", "Общий носовой ход (черепа)"], ["Meatus nasalis inferior cranii", "Alumine ninakäik (koljus)", "Нижний носовой ход (черепа)"], ["Meatus nasalis medius cranii", "Keskmine ninakäik (koljus)", "Средний носовой ход (черепа)"], ["Meatus nasalis superior cranii", "Ülemine ninakäik (koljus)", "Верхний носовой ход (черепа)"], ["Meatus nasopharyngeus", "Ninaneelukäik", "Носоглоточный ход"], ["Meatus nasopharyngeus cranii", "Kolju ninaneelukäik", "Носоглоточный ход (черепа)"], ["Meatus superior nasi", "Ülemine ninakäik", "Верхний носовой ход"], ["Medulla oblongata", "Piklikaju", "Продолговатый мозг"], ["Medulla spinalis", "Seljaaju", "Спинной мозг"], ["Mesencephalon", "Keskaju", "Средний мозг"], ["Naris", "Sõõre (ninasõõre)", "Ноздря"], ["Nasus externus", "Välisnina", "Наружный нос"], ["Nuclei basales et structurae pertinentes", "Basaaltuumad ja seonduvad struktuurid", "Базальные ядра и относящиеся к ним структуры"], ["Nucleus lentiformis", "Läätstuum", "Чечевицеобразное ядро"], ["Occiput", "Kukal", "Затылок"], ["Occiput cranii", "Kolju kukal", "Затылок (черепа)"], ["Os ethmoideum", "Sõelluu", "Решётчатая кость"], ["Os frontale", "Otsmikuluu", "Лобная кость"], ["Os lacrimale", "Pisaraluu", "Слёзная кость"], ["Os occipitale", "Kuklaluu", "Затылочная кость"], ["Os parietale", "Kiiruluu", "Теменная кость"], ["Os sphenoideum", "Kiilluu", "Клиновидная кость"], ["Os zygomaticum", "Sarnaluu", "Скуловая кость"], ["Ostium pharyngeum tubae auditivae", "Kuulmetõri neelusuue", "Глоточное отверстие слуховой трубы"], ["Palatum durum", "Kõva suulagi", "Твёрдое нёбо"], ["Palatum molle", "Pehme suulagi", "Мягкое нёбо"], ["Palatum osseum", "Luuline suulagi", "Костное нёбо"], ["Palpebra inferior", "Alalaug", "Нижнее веко"], ["Palpebra superior", "Ülalaug", "Верхнее веко"], ["Paries inferior orbitae", "Silmakoopa alumine sein", "Нижняя стенка глазницы"], ["Paries lateralis orbitae", "Silmakoopa külgmine sein", "Латеральная стенка глазницы"], ["Paries medialis orbitae", "Silmakoopa keskmine sein", "Медиальный стенка глазницы"], ["Paries superior orbitae", "Silmakoopa ülemine sein", "Верхняя стенка глазницы"], ["Pars basilaris ossis occipitalis", "Kuklaluu põhimikuosa", "Базилярная часть затылочной кости"], ["Pars cavernosa arteriae carotidis internae", "Sisemise unearteri korgasosa", "Пещеристая часть внутренней сонной артерии"], ["Pars centralis ventriculi lateralis", "Külgvatsakese keskosa", "Центральная часть бокового желудочка"], ["Pars cerebralis arteriae carotidis internae", "Sisemise unearteri ajuosa", "Мозговая часть внутренней сонной артерии"], ["Pars cervicalis arteriae carotidis internae", "Sisemise unearteri kaelaosa", "Шейная часть внутренней сонной артерии"], ["Pars nasalis ossis frontalis", "Otsmikuluu ninaosa", "Носовая часть лобной кости"], ["Pars orbitalis ossis frontalis", "Otsmikuluu silmakoopaosa", "Глазничная часть лобной кости"], ["Pars ossea septi nasi", "Ninavaheseina luuline osa", "Костная часть перегородки носа"], ["Pars petrosa arteriae carotidis internae", "Sisemise unearteri kaljuosa", "Каменистая часть внутренней сонной артерии"], ["Pars petrosa ossis temporalis", "Oimuluu kaljuosa (püramiid)", "Каменистая часть височной кости (пирамида)"], ["Pars squamosa ossis temporalis", "Oimuluu soomusosa", "Чешуйчатая часть височной кости"], ["Pars tympanica ossis temporalis", "Oimuluu trummiosa", "Барабанная часть височной кости"], ["Pedunculi cerebellares", "Väikeajuvarred", "Мозжечковые ножки"], ["Pedunculus cerebri", "Suurajujalg", "Ножка мозга"], ["Pharynx", "Neel", "Глотка"], ["Plexus chorioideus ventriculi lateralis", "Külgvatsakese soonpõimik", "Сосудистое сплетение бокового желудочка"], ["Plexus chorioideus ventriculi tertii", "Kolmanda vatsakese soonpõimik", "Сосудистое сплетение третьего желудочка"], ["Pons", "Ajusild (pons)", "Мост (варолиев мост)"], ["Porus acusticus externus cranii", "Välimine kuulmeava", "Наружное слуховое отверстие"], ["Porus acusticus internus", "Sisemine kuulmeava", "Внутреннее слуховое отверстие"], ["Processus alveolaris maxillae", "Ülalõualuu sombujätke (alveolaarjätke)", "Альвеолярный отросток верхней челюсти"], ["Processus clinoideus anterior", "Eesmine kaldjätke", "Передний наклонённый отросток"], ["Processus clinoideus posterior", "Tagumine kaldjätke", "Задний наклонённый отросток"], ["Processus coronoideus mandibulae", "Alalõualuu pärgjätke", "Венечный отросток нижней челюсти"], ["Processus frontalis maxillae", "Ülalõualuu otsmikujätke", "Лобный отросток верхней челюсти"], ["Processus frontalis ossis zygomatici", "Sarnaluu otsmikujätke", "Лобный отросток скуловой кости"], ["Processus mastoideus", "Nibujätke", "Сосцевидный отросток"], ["Processus palatinus", "Suulaejätke", "Нёбный отросток"], ["Processus styloideus ossis temporalis", "Oimuluu tikkeljätke", "Шиловидный отросток височной кости"], ["Processus temporalis ossis zygomatici", "Sarnaluu oimujätke", "Височный отросток скуловой кости"], ["Processus transversus", "Ristijätke", "Поперечный отросток"], ["Processus zygomaticus maxillae", "Ülalõualuu sarnajätke", "Скуловой отросток верхней челюсти"], ["Processus zygomaticus ossis frontalis", "Otsmikuluu sarnajätke", "Скуловой отросток лобной кости"], ["Processus zygomaticus ossis temporalis", "Oimuluu sarnajätke", "Скуловой отросток височной кости"], ["Protuberantia occipitalis externa", "Välimine kuklamügar", "Наружный затылочный выступ"], ["Protuberantia occipitalis interna", "Sisemine kuklamügar", "Внутренний затылочный выступ"], ["Radiatio corporis callosi", "Mõhnkeha kiirgus", "Лучистость мозолистого тела"], ["Radix nasi", "Ninajuur", "Корень носа"], ["Ramus mandibulae", "Alalõuaharu", "Ветвь нижней челюсти"], ["Recessus pharyngeus", "Neelusopp", "Глоточный карман"], ["Recessus sphenoethmoideus", "Kiil-sõelluusopp", "Клиновидно-решётчатое углубление"], ["Recessus sphenoethmoideus cranii", "Kolju kiil-sõelluusopp", "Клиновидно-решётчатое углубление (черепа)"], ["Rima palpebrarum", "Silmalau pilu", "Щель век (глазная щель)"], ["Rostrum corporis callosi", "Mõhnkeha nokk", "Клюв мозолистого тела"], ["Rostrum sphenoideum", "Kiilluunokk", "Клиновидный клюв"], ["Sella turcica", "Türgi sadul", "Турецкое седло"], ["Septum nasi", "Ninavahesein", "Перегородка носа"], ["Septum pellucidum", "Läbipaistev vahesein", "Прозрачная перегородка"], ["Septum sinuum frontalium", "Otsmikusiinuste vahesein", "Перегородка лобных пазух"], ["Septum sinuum sphenoideorum", "Kiilluusiinuste vahesein", "Перегородка клиновидных пазух"], ["Sinciput", "Eespea (laup)", "Передняя часть головы (чело)"], ["Sinus cavernosus", "Korgassiinus", "Пещеристый синус"], ["Sinus frontalis", "Otsmikusiinus (otsmikuurk)", "Лобная пазуха"], ["Sinus maxillae", "Ülalõuasiinus (ülalõuaurk)", "Пазуха верхней челюсти"], ["Sinus maxillaris", "Ülalõuasiinus (ülalõuaurk)", "Верхнечелюстная пазуха (гайморова пазуха)"], ["Sinus occipitalis", "Kuklasiinus", "Затылочный синус"], ["Sinus ossis frontalis", "Otsmikuluu siinus (otsmikuurk)", "Пазуха лобной кости"], ["Sinus ossis sphenoidei", "Kiilluusiinus (kiilluu-urk)", "Пазуха клиновидной кости"], ["Sinus rectus", "Sirgsiinus", "Прямой синус"], ["Sinus sagittalis inferior", "Alumine sagitaalsiinus", "Нижний сагиттальный синус"], ["Sinus sagittalis superior", "Ülemine sagitaalsiinus", "Верхний сагиттальный синус"], ["Sinus sigmoideus", "Sigmasiinus", "Сигмовидный синус"], ["Sinus sphenoideus", "Kiilluusiinus (kiilluu-urk)", "Клиновидная пазуха"], ["Sinus transversus", "Ristsiinus", "Поперечный синус"], ["Spina nasalis anterior", "Eesmine ninaoga", "Передняя носовая ость"], ["Spina nasalis ossis frontalis", "Otsmikuluu ninaoga", "Носовая ость лобной кости"], ["Spina nasalis posterior", "Tagumine ninaoga", "Задняя носовая ость"], ["Spina ossis sphenoidei", "Kiilluuoga", "Ость клиновидной кости"], ["Splenium corporis callosi", "Mõhnkeha paksend", "Валик мозолистого тела"], ["Squama frontalis", "Otsmikuluu soomus", "Лобная чешуя"], ["Squama occipitalis", "Kuklaluu soomus", "Затылочная чешуя"], ["Stoma", "Suu (suuava)", "Рот (ротовое отверстие)"], ["Sulci venosi", "Veenivaod", "Венозные борозды"], ["Sulcus arteriae vertebralis", "Selgrooarteri vagu", "Борозда позвоночной артерии"], ["Sulcus carotidis", "Unearterivagu", "Сонная борозда"], ["Sulcus lacrimalis", "Pisaravagu", "Слёзная борозда"], ["Sulcus palatinus major maxillae", "Ülalõualuu suur suulaevagu", "Большая нёбная борозда верхней челюсти"], ["Sulcus sinus sagittalis superioris", "Ülemise sagitaalsiinuse vagu", "Борозда верхнего сагиттального синуса"], ["Sulcus tubae auditivae", "Kuulmetõri vagu", "Борозда слуховой трубы"], ["Tegmen tympani", "Trummiõõne katus (trummikatus)", "Крыша барабанной полости"], ["Tela chorioidea ventriculi quarti", "Neljanda vatsakese soonkile", "Сосудистая основа четвёртого желудочка"], ["Tempus", "Oim (meelekoht)", "Висок"], ["Tentorium cerebelli", "Väikeajutelk", "Намёт мозжечка"], ["Thalamus", "Talamus", "Таламус (зрительный бугор)"], ["Tonsilla cerebelli [H IX]", "Väikeajumandel [H IX]", "Миндалина мозжечка [Н IX]"], ["Torus tubarius", "Kuulmetõri paksend", "Трубный валик"], ["Tractus opticus", "Nägemistrakt", "Зрительный тракт"], ["Truncus corporis callosi", "Mõhnkeha tüvi", "Ствол мозолистого тела"], ["Truncus encephali", "Ajutüvi", "Ствол головного мозга"], ["Tuber maxillae", "Ülalõuamügar", "Бугор верхней челюсти"], ["Tuberculum articulare", "Liigesekühmuke", "Суставной бугорок"], ["Tuberculum jugulare", "Kägikühmuke", "Яремный бугорок"], ["Vagina processus styloidei", "Tikkeljätketupp", "Влагалище шиловидного отростка"], ["Vena anastomotica inferior", "Alumine anastomoosveen (Labbé veen)", "Нижняя анастомотическая вена (вена Лаббе)"], ["Vena anastomotica superior", "Ülemine anastomoosveen (Trolardi veen)", "Верхняя анастомотическая вена (вена Тролара)"], ["Vena basalis", "Põhimikuveen (Rosenthali veen)", "Базальная вена (вена Розенталя)"], ["Vena interna cerebri", "Sisemine ajuveen", "Внутренняя мозговая вена"], ["Vena jugularis interna", "Sisemine kägiveen", "Внутренняя яремная вена"], ["Vena magna cerebri", "Suur ajuveen (Galenose veen)", "Большая мозговая вена (вена Галена)"], ["Vena media superficialis cerebri", "Pindmine keskmine ajuveen", "Поверхностная средняя мозговая вена"], ["Vena thalamostriata superior", "Ülemine talamostriaalveen", "Верхняя таламостриарная вена"], ["Ventriculi cerebri", "Ajuvatsakesed", "Желудочки головного мозга"], ["Ventriculus lateralis", "Külgvatsake", "Боковой желудочек"], ["Ventriculus quartus", "Neljas vatsake", "Четвёртый желудочек"], ["Ventriculus tertius", "Kolmas vatsake", "Третий желудочек"], ["Vermis cerebelli", "Väikeajuuss", "Червь мозжечка"], ["Vertex", "Pealagi", "Темя (макушка)"], ["Vestibulum nasi", "Ninaesik", "Преддверие носа"], ["Vomer", "Sahkluu", "Сошник"]];
+        const RAW_GLOSSARY_DATA = [["Adhaesio interthalamica", "Talamustevaheline liide", "Межталамическое сращение"], ["Ala major", "Suur tiib (kiilluu suur tiib)", "Большое крыло (клиновидной кости)"], ["Ala minor", "Väike tiib (kiilluu väike tiib)", "Малое крыло (клиновидной кости)"], ["Ala nasi", "Ninatiib", "Крыло носа"], ["Angulus pontocerebellaris", "Silla-väikeaju nurk", "Мостомозжечковый угол"], ["Anulus tympanicus", "Trummivõru", "Барабанное кольцо"], ["Apertura ductus nasolacrimalis", "Nina-pisarajuha avaus", "Апертура носослёзного протока"], ["Apertura externa canalis carotidis", "Unearterikanali välimine avaus", "Наружная апертура сонного канала"], ["Apertura interna canalis carotidis", "Unearterikanali sisemine avaus", "Внутренняя апертура сонного канала"], ["Apertura lateralis ventriculi quarti", "Neljanda vatsakese külgmine avaus (Luschka ava)", "Латеральная апертура четвёртого желудочка"], ["Apertura mediana ventriculi quarti", "Neljanda vatsakese keskmine avaus (Magendie ava)", "Срединная апертура четвёртого желудочка"], ["Apertura sinus frontalis", "Otsmikusiinuse avaus", "Апертура лобной пазухи"], ["Apertura sinus ossis sphenoidei", "Kiilluusiinuse avaus", "Апертура клиновидной пазухи"], ["Apex partis petrosae", "Kaljuosa tipp", "Верхушка каменистой части"], ["Aquaeductus mesencephali", "Keskaju veejuha", "Водопровод среднего мозга"], ["Arcus anterior atlantis", "Kandelüli eesmine kaar", "Передняя дуга атланта"], ["Arcus posterior atlantis", "Kandelüli tagumine kaar", "Задняя дуга атланта"], ["Arcus superciliaris", "Kulmukaar", "Надбровная дуга"], ["Arcus zygomaticus", "Sarnakaar", "Скуловая дуга"], ["Arteria basilaris", "Basilaararter (põhimikuarter)", "Базилярная артерия"], ["Arteria cerebri anterior: Pars postcommunicalis; Segmentum A2 [A2]", "Eesmine ajuarter: ühendusejärgne osa (A2-segment)", "Передняя мозговая артерия: посткоммуникационная часть (сегмент А2)"], ["Arteria cerebri anterior: Pars precommunicalis; Segmentum A1 [A1]", "Eesmine ajuarter: ühenduseelne osa (A1-segment)", "Передняя мозговая артерия: предкоммуникационная часть (сегмент А1)"], ["Arteria cerebri media: Pars insularis; Segmentum M2 [M2]", "Keskmine ajuarter: saareosa (M2-segment)", "Средняя мозговая артерия: островковая часть (сегмент M2)"], ["Arteria cerebri media: Pars sphenoidalis; Pars horizontalis; Segmentum M1 [M1]", "Keskmine ajuarter: kiilluuosa / horisontaalosa (M1-segment)", "Средняя мозговая артерия: клиновидная / горизонтальная часть (сегмент М1)"], ["Arteria cerebri posterior: Pars postcommunicalis; Segmentum P2 [P2]", "Tagumine ajuarter: ühendusejärgne osa (P2-segment)", "Задняя мозговая артерия: посткоммуникационная часть (сегмент Р2)"], ["Arteria cerebri posterior: Pars precommunicalis; Segmentum P1 [P1]", "Tagumine ajuarter: ühenduseelne osa (P1-segment)", "Задняя мозговая артерия: предкоммуникационная часть (сегмент Р1)"], ["Arteria communicans anterior", "Eesmine ühendusarter", "Передняя соединительная артерия"], ["Arteria communicans posterior", "Tagumine ühendusarter", "Задняя соединительная артерия"], ["Arteria inferior posterior cerebelli", "Väikeaju alumine tagumine arter", "Задняя нижняя мозжечковая артерия"], ["Arteria superior cerebelli", "Väikeaju ülemine arter", "Верхняя мозжечковая артерия"], ["Arteria vertebralis: Segmentum extraduralis; Segmentum atlanticum (V3) [V3]", "Selgrooarter: kõvakestaväline / kandelüliosa (V3-segment)", "Позвоночная артерия: экстрадуральный / атлантовый сегмент (V3)"], ["Arteria vertebralis: Segmentum foraminalis (V2) [V2]", "Selgrooarter: ristijätkemulkude osa (V2-segment)", "Позвоночная артерия: фораминальный сегмент (V2)"], ["Arteria vertebralis: Segmentum intraduralis; Segmentum intracranialis (V4) [V4]", "Selgrooarter: kõvakestasisene / koljusisene osa (V4-segment)", "Позвоночная артерия: интрадуральный / внутричерепной сегмент (V4)"], ["Articulatio atlantoaxialis mediana", "Keskmine kande-telglüliliiges", "Срединный атлантоосевой сустав"], ["Articulatio atlantooccipitalis", "Kandelüli-kuklaluuliiges", "Атлантозатылочный сустав"], ["Articulatio temporomandibularis", "Alalõualiiges", "Височно-нижнечелюстной сустав"], ["Atlas", "Kandelüli (atlas)", "Атлант (первый шейный позвонок)"], ["Atrium meatus medii", "Keskmise ninakäigu esik (aatrium)", "Преддверие среднего носового хода"], ["Atrium ventriculi lateralis", "Külgvatsakese kolmnurk (aatrium)", "Преддверие (треугольник) бокового желудочка"], ["Auris", "Kõrv", "Ухо"], ["Axis", "Telglüli (aksis)", "Осевой позвонок (аксис)"], ["Basis cranii", "Koljupõhimik", "Основание черепа"], ["Bucca", "Põsk", "Щека"], ["Bulla ethmoidea", "Sõelluupõis", "Решётчатый пузырёк"], ["Bulla ethmoidea ossea", "Luuline sõelluupõis", "Костный решётчатый пузырёк"], ["Calcar avis", "Kukekannus", "Птичья шпора"], ["Calvaria", "Koljuvõlv", "Свод черепа"], ["Canales diploici", "Diploekanalid", "Диплоические каналы"], ["Canales incisivi", "Lõikehambakanalid", "Резцовые каналы"], ["Canalis carotidis", "Unearterikanal", "Сонный канал"], ["Canalis condylaris", "Põndakanal", "Мыщелковый канал"], ["Canalis facialis", "Näonärvikanal", "Лицевой канал"], ["Canalis hypoglossus", "Keelealuse närvi kanal", "Подъязычный канал"], ["Canalis infraorbitalis", "Silmakoopaalune kanal", "Подглазничный канал"], ["Canalis mandibulae", "Alalõuakanal", "Канал нижней челюсти"], ["Canalis musculotubarius", "Lihase-kuulmetõri kanal", "Мышечно-трубный канал"], ["Canalis nasolacrimalis", "Nina-pisarakanal", "Носослёзный канал"], ["Canalis opticus", "Nägemisnärvikanal", "Зрительный канал"], ["Canalis palatinus major", "Suur suulaekanal", "Большой нёбный канал"], ["Canalis pterygoideus", "Tiibjätkekanal", "Крыловидный канал"], ["Capsula interna", "Sisemine kihn", "Внутренняя капсула"], ["Caput", "Pea", "Голова"], ["Caput nuclei caudati", "Sabatuuma pea", "Головка хвостатого ядра"], ["Cauda nuclei caudati", "Sabatuuma saba", "Хвост хвостатого ядра"], ["Cavitas cranii", "Koljuõõs", "Полость черепа"], ["Cavitas orbitae", "Silmakoobas", "Глазница (полость глазницы)"], ["Cavitas oris", "Suuõõs", "Полость рта"], ["Cavitas tympani cranii", "Trummiõõs", "Барабанная полость"], ["Cavum trigeminale", "Kolmiknärviõõs", "Тройничная полость"], ["Cellulae ethmoideae anteriores", "Eesmised sõelluurakud", "Передние решётчатые ячейки"], ["Cellulae ethmoideae mediae", "Keskmised sõelluurakud", "Средние решётчатые ячейки"], ["Cellulae ethmoideae posteriores", "Tagumised sõelluurakud", "Задние решётчатые ячейки"], ["Cerebellum", "Väikeaju", "Мозжечок"], ["Chiasma opticum", "Nägemisristmik", "Зрительный перекрёст"], ["Choana", "Tagasõõre (koaan)", "Хоана"], ["Choana cranii", "Kolju tagasõõre (koaan)", "Хоана черепа"], ["Circulus arteriosus cerebri", "Suuraju arteriaalring (Willise ring)", "Артериальный круг большого мозга"], ["Clivus", "Nõlv (kliivus)", "Скат"], ["Collum", "Kael", "Шея"], ["Collum mandibulae", "Alalõuakael", "Шейка нижней челюсти"], ["Commissura anterior", "Eesmine komissuur", "Передняя спайка"], ["Commissura posterior", "Tagumine komissuur", "Задняя спайка"], ["Concha inferior nasi", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha media nasi", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis inferior", "Alumine ninakarbik", "Нижняя носовая раковина"], ["Concha nasalis media", "Keskmine ninakarbik", "Средняя носовая раковина"], ["Concha nasalis superior", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Concha superior nasi", "Ülemine ninakarbik", "Верхняя носовая раковина"], ["Condylus mandibulae", "Alalõuapõnt (alalõuapea)", "Мыщелок (головка) нижней челюсти"], ["Condylus occipitalis", "Kuklapõnt", "Затылочный мыщелок"], ["Confluens sinuum", "Siinuste ühinemiskoht", "Сток синусов"], ["Cornu frontale", "Otsmikusarv (eesmine sarv)", "Лобный (передний) рог"], ["Cornu occipitale", "Kuklasarv (tagumine sarv)", "Затылочный (задний) рог"], ["Cornu temporale", "Oimusarv (alumine sarv)", "Височный (нижний) рог"], ["Corona radiata", "Kiirtepärg", "Лучистый венец"], ["Corpus adiposum buccae", "Põse rasvkeha", "Жировое тело щеки"], ["Corpus nuclei caudati", "Sabatuuma keha", "Тело хвостатого ядра"], ["Corpus ossis sphenoidei", "Kiilluu keha", "Тело клиновидной кости"], ["Cranium", "Kolju", "Череп"], ["Crista frontalis", "Otsmikuhari", "Лобный гребень"], ["Crista galli", "Kukehari", "Петушиный гребень"], ["Crista lacrimalis posterior", "Tagumine pisarahari", "Задний слёзный гребень"], ["Crista nasalis maxillae", "Ülalõualuu ninahari", "Носовой гребень верхней челюсти"], ["Crista nasalis ossis palatini", "Suulaeluu ninahari", "Носовой гребень нёбной кости"], ["Crista occipitalis externa", "Välimine kuklahari", "Наружный затылочный гребень"], ["Crista occipitalis interna", "Sisemine kuklahari", "Внутренний затылочный гребень"], ["Crista sphenoidea", "Kiilluuhari", "Клиновидный гребень"], ["Dens axis", "Telglüli hammas", "Зуб осевого позвонка"], ["Dentes", "Hambad", "Зубы"], ["Diaphragma sellae", "Sadulavahelihas (saduladiafragma)", "Диафрагма седла"], ["Diencephalon", "Vaheaju", "Промежуточный мозг"], ["Diploe", "Diploe", "Диплоэ"], ["Dorsum nasi", "Ninaselg", "Спинка носа"], ["Dorsum sellae", "Sadulaselg", "Спинка седла"], ["Encephalon", "Peaaju", "Головной мозг"], ["Facies", "Nägu", "Лицо"], ["Facies anterior maxillae", "Ülalõualuu eesmine pind", "Передняя поверхность верхней челюсти"], ["Facies articularis superior atlantis", "Kandelüli ülemine liigesepind", "Верхняя суставная поверхность атланта"], ["Facies infratemporalis maxillae", "Ülalõualuu oimualune pind", "Подвисочная поверхность верхней челюсти"], ["Facies nasalis maxillae", "Ülalõualuu ninapind", "Носовая поверхность верхней челюсти"], ["Facies orbitalis maxillae", "Ülalõualuu silmakoopapind", "Глазничная поверхность верхней челюсти"], ["Falx cerebelli", "Väikeajusirp", "Серп мозжечка"], ["Falx cerebri", "Suurajusirp", "Серп большого мозга"], ["Fissura chorioidea", "Soonpõimikulõhe", "Сосудистая щель"], ["Fissura orbitalis inferior", "Alumine silmakoopalõhe", "Нижняя глазничная щель"], ["Fissura orbitalis superior", "Ülemine silmakoopalõhe", "Верхняя глазничная щель"], ["Flocculus [H X]", "Flokulus (väikeajututt) [H X]", "Клочок мозжечка [Н Х]"], ["Foramen alveolare inferius", "Alalõuamulk", "Нижнее альвеолярное отверстие (отверстие нижней челюсти)"], ["Foramen caecum ossis frontalis", "Otsmikuluu umbmulk", "Слепое отверстие лобной кости"], ["Foramen infraorbitale", "Silmakoopaalune mulk", "Подглазничное отверстие"], ["Foramen interventriculare", "Vatsakestevaheline mulk", "Межжелудочковое отверстие"], ["Foramen jugulare", "Kägimulk", "Яремное отверстие"], ["Foramen lacerum", "Rebimulk", "Рваное отверстие"], ["Foramen magnum", "Suur kuklamulk", "Большое (затылочное) отверстие"], ["Foramen mastoideum", "Nibujätkemulk", "Сосцевидное отверстие"], ["Foramen ovale", "Ovaalmulk", "Овальное отверстие"], ["Foramen palatinum majus", "Suur suulaemulk", "Большое нёбное отверстие"], ["Foramen parietale", "Kiiruluumulk", "Теменное отверстие"], ["Foramen rotundum", "Ümarmulk", "Круглое отверстие"], ["Foramen sphenopalatinum", "Kiilluu-suulaemulk", "Клиновидно-нёбное отверстие"], ["Foramen spinosum", "Ogamulk", "Остистое отверстие"], ["Foramen stylomastoideum", "Tikkel-nibujätkemulk", "Шилососцевидное отверстие"], ["Foramen transversarium", "Ristijätkemulk", "Поперечное отверстие"], ["Fornix", "Ajukaar (võlv)", "Свод"], ["Fossa anterior cranii", "Eesmine koljuauk", "Передняя черепная ямка"], ["Fossa condylaris", "Põndaauk", "Мыщелковая ямка"], ["Fossa incisiva", "Lõikehambaauk", "Резцовая ямка"], ["Fossa jugularis", "Kägiauk", "Яремная ямка"], ["Fossa mandibularis", "Alalõuaauk", "Нижнечелюстная ямка"], ["Fossa media cranii", "Keskmine koljuauk", "Средняя черепная ямка"], ["Fossa posterior cranii", "Tagumine koljuauk", "Задняя черепная ямка"], ["Fossa pterygoidea", "Tiibjätkeauk", "Крыловидная ямка"], ["Fossa scaphoidea", "Lootsikauk (paatjas auk)", "Ладьевидная ямка"], ["Fossula petrosa", "Kaljulohuke", "Каменистая ямочка"], ["Fovea pterygoidea", "Tiibjätkelohk", "Крыловидная ямка (нижней челюсти)"], ["Foveolae granulares", "Granulatsioonilohukesed", "Ямочки грануляций"], ["Frons cranii", "Otsmik (laup)", "Лоб"], ["Genu corporis callosi", "Mõhnkeha põlv", "Колено мозолистого тела"], ["Gingiva", "Ige", "Десна"], ["Glabella", "Kulmudevahe (glabella)", "Глабелла (надпереносье)"], ["Glandula parotidea", "Kõrvasüljenääre", "Околоушная слюнная железа"], ["Glandula pinealis", "Käbikeha (epifüüs)", "Шишковидное тело (эпифиз)"], ["Granulationes arachnoideae", "Ämblikuvõrkkesta granulatsioonid", "Грануляции паутинной оболочки"], ["Hamulus pterygoideus", "Tiibjätkekonks", "Крыловидный крючок"], ["Hemisphaerium cerebelli", "Väikeaju poolkera", "Полушарие мозжечка"], ["Hemisphaerium cerebri", "Suuraju poolkera", "Полушарие большого мозга"], ["Hiatus maxillae", "Ülalõuaurkehaigutus", "Расщелина верхнечелюстной пазухи"], ["Hypophysis", "Ajuripats (hüpofüüs)", "Гипофиз"], ["Hypothalamus", "Hüpotalamus", "Гипоталамус"], ["Incisura jugularis ossis occipitalis", "Kuklaluu kägisälk", "Яремная вырезка затылочной кости"], ["Incisura jugularis ossis temporalis", "Oimuluu kägisälk", "Яремная вырезка височной кости"], ["Incisura mandibulae", "Alalõuasälk", "Вырезка нижней челюсти"], ["Incisura mastoidea", "Nibujätkesälk", "Сосцевидная вырезка"], ["Incisura pterygoidea", "Tiibjätkesälk", "Крыловидная вырезка"], ["Incisura supraorbitalis", "Silmakoopaülene sälk", "Надглазничная вырезка"], ["Incisura tentorii", "Väikeajutelgi sälk", "Вырезка намёта мозжечка"], ["Infundibulum ethmoideum", "Sõelluulehter", "Решётчатая воронка"], ["Infundibulum ethmoideum osseum", "Luuline sõelluulehter", "Костная решётчатая воронка"], ["Insula", "Saar (Reili saar)", "Островок (островковая доля)"], ["Jugum sphenoideum", "Kiilluuike", "Клиновидное возвышение"], ["Labium superius oris", "Ülahuul", "Верхняя губа"], ["Labyrinthus ethmoideus", "Sõelluulabürint", "Решётчатый лабиринт"], ["Lamina cribrosa", "Sõellest", "Решётчатая пластинка"], ["Lamina horizontalis ossis palatini", "Suulaeluu rõhtlest", "Горизонтальная пластинка нёбной кости"], ["Lamina lateralis processus pterygoidei", "Tiibjätke külgmine lest", "Латеральная пластинка крыловидного отростка"], ["Lamina medialis processus pterygoidei", "Tiibjätke keskmine lest", "Медиальная пластинка крыловидного отростка"], ["Lamina orbitalis labyrinthi ethmoidei", "Sõelluulabürindi silmakoopalest", "Глазничная пластинка решётчатого лабиринта"], ["Lamina perpendicularis ossis ethmoidei", "Sõelluu püstlest", "Перпендикулярная пластинка решётчатой кости"], ["Lamina perpendicularis ossis palatini", "Suulaeluu püstlest", "Перпендикулярная пластинка нёбной кости"], ["Lingua", "Keel", "Язык"], ["Lobus anterior cerebelli", "Väikeaju eesmine sagar", "Передняя доля мозжечка"], ["Lobus frontalis", "Otsmikusagar", "Лобная доля"], ["Lobus occipitalis", "Kuklasagar", "Затылочная доля"], ["Lobus parietalis", "Kiirusagar", "Теменная доля"], ["Lobus posterior cerebelli", "Väikeaju tagumine sagar", "Задняя доля мозжечка"], ["Lobus temporalis", "Oimusagar", "Височная доля"], ["Margo infraorbitalis", "Silmakoopa alumine serv", "Подглазничный край"], ["Margo lateralis orbitae", "Silmakoopa külgmine serv", "Латеральный край глазницы"], ["Margo medialis orbitae", "Silmakoopa keskmine serv", "Медиальный край глазницы"], ["Margo supraorbitalis", "Silmakoopa ülemine serv", "Надглазничный край"], ["Massa lateralis atlantis", "Kandelüli külgmass", "Латеральная масса атланта"], ["Maxilla", "Ülalõualuu", "Верхняя челюсть"], ["Meatus acusticus externus cranii", "Välimine kuulmekäik", "Наружный слуховой проход"], ["Meatus acusticus internus", "Sisemine kuulmekäik", "Внутренний слуховой проход"], ["Meatus communis nasi", "Ühine ninakäik", "Общий носовой ход"], ["Meatus inferior nasi", "Alumine ninakäik", "Нижний носовой ход"], ["Meatus medius nasi", "Keskmine ninakäik", "Средний носовой ход"], ["Meatus nasalis communis cranii", "Ühine ninakäik (koljus)", "Общий носовой ход (черепа)"], ["Meatus nasalis inferior cranii", "Alumine ninakäik (koljus)", "Нижний носовой ход (черепа)"], ["Meatus nasalis medius cranii", "Keskmine ninakäik (koljus)", "Средний носовой ход (черепа)"], ["Meatus nasalis superior cranii", "Ülemine ninakäik (koljus)", "Верхний носовой ход (черепа)"], ["Meatus nasopharyngeus", "Ninaneelukäik", "Носоглоточный ход"], ["Meatus nasopharyngeus cranii", "Kolju ninaneelukäik", "Носоглоточный ход (черепа)"], ["Meatus superior nasi", "Ülemine ninakäik", "Верхний носовой ход"], ["Medulla oblongata", "Piklikaju", "Продолговатый мозг"], ["Medulla spinalis", "Seljaaju", "Спинной мозг"], ["Mesencephalon", "Keskaju", "Средний мозг"], ["Naris", "Sõõre (ninasõõre)", "Ноздря"], ["Nasus externus", "Välisnina", "Наружный нос"], ["Nuclei basales et structurae pertinentes", "Basaaltuumad ja seonduvad struktuurid", "Базальные ядра и относящиеся к ним структуры"], ["Nucleus lentiformis", "Läätstuum", "Чечевицеобразное ядро"], ["Occiput", "Kukal", "Затылок"], ["Occiput cranii", "Kolju kukal", "Затылок (черепа)"], ["Os ethmoideum", "Sõelluu", "Решётчатая кость"], ["Os frontale", "Otsmikuluu", "Лобная кость"], ["Os lacrimale", "Pisaraluu", "Слёзная кость"], ["Os occipitale", "Kuklaluu", "Затылочная кость"], ["Os parietale", "Kiiruluu", "Теменная кость"], ["Os sphenoideum", "Kiilluu", "Клиновидная кость"], ["Os zygomaticum", "Sarnaluu", "Скуловая кость"], ["Ostium pharyngeum tubae auditivae", "Kuulmetõri neelusuue", "Глоточное отверстие слуховой трубы"], ["Palatum durum", "Kõva suulagi", "Твёрдое нёбо"], ["Palatum molle", "Pehme suulagi", "Мягкое нёбо"], ["Palatum osseum", "Luuline suulagi", "Костное нёбо"], ["Palpebra inferior", "Alalaug", "Нижнее веко"], ["Palpebra superior", "Ülalaug", "Верхнее веко"], ["Paries inferior orbitae", "Silmakoopa alumine sein", "Нижняя стенка глазницы"], ["Paries lateralis orbitae", "Silmakoopa külgmine sein", "Латеральная стенка глазницы"], ["Paries medialis orbitae", "Silmakoopa keskmine sein", "Медиальная стенка глазницы"], ["Paries superior orbitae", "Silmakoopa ülemine sein", "Верхняя стенка глазницы"], ["Pars basilaris ossis occipitalis", "Kuklaluu põhimikuosa", "Базилярная часть затылочной кости"], ["Pars cavernosa arteriae carotidis internae", "Sisemise unearteri korgasosa", "Пещеристая часть внутренней сонной артерии"], ["Pars centralis ventriculi lateralis", "Külgvatsakese keskosa", "Центральная часть бокового желудочка"], ["Pars cerebralis arteriae carotidis internae", "Sisemise unearteri ajuosa", "Мозговая часть внутренней сонной артерии"], ["Pars cervicalis arteriae carotidis internae", "Sisemise unearteri kaelaosa", "Шейная часть внутренней сонной артерии"], ["Pars nasalis ossis frontalis", "Otsmikuluu ninaosa", "Носовая часть лобной кости"], ["Pars orbitalis ossis frontalis", "Otsmikuluu silmakoopaosa", "Глазничная часть лобной кости"], ["Pars ossea septi nasi", "Ninavaheseina luuline osa", "Костная часть перегородки носа"], ["Pars petrosa arteriae carotidis internae", "Sisemise unearteri kaljuosa", "Каменистая часть внутренней сонной артерии"], ["Pars petrosa ossis temporalis", "Oimuluu kaljuosa (püramiid)", "Каменистая часть височной кости (пирамида)"], ["Pars squamosa ossis temporalis", "Oimuluu soomusosa", "Чешуйчатая часть височной кости"], ["Pars tympanica ossis temporalis", "Oimuluu trummiosa", "Барабанная часть височной кости"], ["Pedunculi cerebellares", "Väikeajuvarred", "Мозжечковые ножки"], ["Pedunculus cerebri", "Suurajujalg", "Ножка мозга"], ["Pharynx", "Neel", "Глотка"], ["Plexus chorioideus ventriculi lateralis", "Külgvatsakese soonpõimik", "Сосудистое сплетение бокового желудочка"], ["Plexus chorioideus ventriculi tertii", "Kolmanda vatsakese soonpõimik", "Сосудистое сплетение третьего желудочка"], ["Pons", "Ajusild (pons)", "Мост (варолиев мост)"], ["Porus acusticus externus cranii", "Välimine kuulmeava", "Наружное слуховое отверстие"], ["Porus acusticus internus", "Sisemine kuulmeava", "Внутреннее слуховое отверстие"], ["Processus alveolaris maxillae", "Ülalõualuu sombujätke (alveolaarjätke)", "Альвеолярный отросток верхней челюсти"], ["Processus clinoideus anterior", "Eesmine kaldjätke", "Передний наклонённый отросток"], ["Processus clinoideus posterior", "Tagumine kaldjätke", "Задний наклонённый отросток"], ["Processus coronoideus mandibulae", "Alalõualuu pärgjätke", "Венечный отросток нижней челюсти"], ["Processus frontalis maxillae", "Ülalõualuu otsmikujätke", "Лобный отросток верхней челюсти"], ["Processus frontalis ossis zygomatici", "Sarnaluu otsmikujätke", "Лобный отросток скуловой кости"], ["Processus mastoideus", "Nibujätke", "Сосцевидный отросток"], ["Processus palatinus", "Suulaejätke", "Нёбный отросток"], ["Processus styloideus ossis temporalis", "Oimuluu tikkeljätke", "Шиловидный отросток височной кости"], ["Processus temporalis ossis zygomatici", "Sarnaluu oimujätke", "Височный отросток скуловой кости"], ["Processus transversus", "Ristijätke", "Поперечный отросток"], ["Processus zygomaticus maxillae", "Ülalõualuu sarnajätke", "Скуловой отросток верхней челюсти"], ["Processus zygomaticus ossis frontalis", "Otsmikuluu sarnajätke", "Скуловой отросток лобной кости"], ["Processus zygomaticus ossis temporalis", "Oimuluu sarnajätke", "Скуловой отросток височной кости"], ["Protuberantia occipitalis externa", "Välimine kuklamügar", "Наружный затылочный выступ"], ["Protuberantia occipitalis interna", "Sisemine kuklamügar", "Внутренний затылочный выступ"], ["Radiatio corporis callosi", "Mõhnkeha kiirgus", "Лучистость мозолистого тела"], ["Radix nasi", "Ninajuur", "Корень носа"], ["Ramus mandibulae", "Alalõuaharu", "Ветвь нижней челюсти"], ["Recessus pharyngeus", "Neelusopp", "Глоточный карман"], ["Recessus sphenoethmoideus", "Kiil-sõelluusopp", "Клиновидно-решётчатое углубление"], ["Recessus sphenoethmoideus cranii", "Kolju kiil-sõelluusopp", "Клиновидно-решётчатое углубление (черепа)"], ["Rima palpebrarum", "Silmalau pilu", "Щель век (глазная щель)"], ["Rostrum corporis callosi", "Mõhnkeha nokk", "Клюв мозолистого тела"], ["Rostrum sphenoideum", "Kiilluunokk", "Клиновидный клюв"], ["Sella turcica", "Türgi sadul", "Турецкое седло"], ["Septum nasi", "Ninavahesein", "Перегородка носа"], ["Septum pellucidum", "Läbipaistev vahesein", "Прозрачная перегородка"], ["Septum sinuum frontalium", "Otsmikusiinuste vahesein", "Перегородка лобных пазух"], ["Septum sinuum sphenoideorum", "Kiilluusiinuste vahesein", "Перегородка клиновидных пазух"], ["Sinciput", "Eespea (laup)", "Передняя часть головы (чело)"], ["Sinus cavernosus", "Korgassiinus", "Пещеристый синус"], ["Sinus frontalis", "Otsmikusiinus (otsmikuurk)", "Лобная пазуха"], ["Sinus maxillae", "Ülalõuasiinus (ülalõuaurk)", "Пазуха верхней челюсти"], ["Sinus maxillaris", "Ülalõuasiinus (ülalõuaurk)", "Верхнечелюстная пазуха (гайморова пазуха)"], ["Sinus occipitalis", "Kuklasiinus", "Затылочный синус"], ["Sinus ossis frontalis", "Otsmikuluu siinus (otsmikuurk)", "Пазуха лобной кости"], ["Sinus ossis sphenoidei", "Kiilluusiinus (kiilluu-urk)", "Пазуха клиновидной кости"], ["Sinus rectus", "Sirgsiinus", "Прямой синус"], ["Sinus sagittalis inferior", "Alumine sagitaalsiinus", "Нижний сагиттальный синус"], ["Sinus sagittalis superior", "Ülemine sagitaalsiinus", "Верхний сагиттальный синус"], ["Sinus sigmoideus", "Sigmasiinus", "Сигмовидный синус"], ["Sinus sphenoideus", "Kiilluusiinus (kiilluu-urk)", "Клиновидная пазуха"], ["Sinus transversus", "Ristsiinus", "Поперечный синус"], ["Spina nasalis anterior", "Eesmine ninaoga", "Передняя носовая ость"], ["Spina nasalis ossis frontalis", "Otsmikuluu ninaoga", "Носовая ость лобной кости"], ["Spina nasalis posterior", "Tagumine ninaoga", "Задняя носовая ость"], ["Spina ossis sphenoidei", "Kiilluuoga", "Ость клиновидной кости"], ["Splenium corporis callosi", "Mõhnkeha paksend", "Валик мозолистого тела"], ["Squama frontalis", "Otsmikuluu soomus", "Лобная чешуя"], ["Squama occipitalis", "Kuklaluu soomus", "Затылочная чешуя"], ["Stoma", "Suu (suuava)", "Рот (ротовое отверстие)"], ["Sulci venosi", "Veenivaod", "Венозные борозды"], ["Sulcus arteriae vertebralis", "Selgrooarteri vagu", "Борозда позвоночной артерии"], ["Sulcus carotidis", "Unearterivagu", "Сонная борозда"], ["Sulcus lacrimalis", "Pisaravagu", "Слёзная борозда"], ["Sulcus palatinus major maxillae", "Ülalõualuu suur suulaevagu", "Большая нёбная борозда верхней челюсти"], ["Sulcus sinus sagittalis superioris", "Ülemise sagitaalsiinuse vagu", "Борозда верхнего сагиттального синуса"], ["Sulcus tubae auditivae", "Kuulmetõri vagu", "Борозда слуховой трубы"], ["Tegmen tympani", "Trummiõõne katus (trummikatus)", "Крыша барабанной полости"], ["Tela chorioidea ventriculi quarti", "Neljanda vatsakese soonkile", "Сосудистая основа четвёртого желудочка"], ["Tempus", "Oim (meelekoht)", "Висок"], ["Tentorium cerebelli", "Väikeajutelk", "Намёт мозжечка"], ["Thalamus", "Talamus", "Таламус (зрительный бугор)"], ["Tonsilla cerebelli [H IX]", "Väikeajumandel [H IX]", "Миндалина мозжечка [Н IX]"], ["Torus tubarius", "Kuulmetõri paksend", "Трубный валик"], ["Tractus opticus", "Nägemistrakt", "Зрительный тракт"], ["Truncus corporis callosi", "Mõhnkeha tüvi", "Ствол мозолистого тела"], ["Truncus encephali", "Ajutüvi", "Ствол головного мозга"], ["Tuber maxillae", "Ülalõuamügar", "Бугор верхней челюсти"], ["Tuberculum articulare", "Liigesekühmuke", "Суставной бугорок"], ["Tuberculum jugulare", "Kägikühmuke", "Яремный бугорок"], ["Vagina processus styloidei", "Tikkeljätketupp", "Влагалище шиловидного отростка"], ["Vena anastomotica inferior", "Alumine anastomoosveen (Labbé veen)", "Нижняя анастомотическая вена (вена Лаббе)"], ["Vena anastomotica superior", "Ülemine anastomoosveen (Trolardi veen)", "Верхняя анастомотическая вена (вена Тролара)"], ["Vena basalis", "Põhimikuveen (Rosenthali veen)", "Базальная вена (вена Розенталя)"], ["Vena interna cerebri", "Sisemine ajuveen", "Внутренняя мозговая вена"], ["Vena jugularis interna", "Sisemine kägiveen", "Внутренняя яремная вена"], ["Vena magna cerebri", "Suur ajuveen (Galenose veen)", "Большая мозговая вена (вена Галена)"], ["Vena media superficialis cerebri", "Pindmine keskmine ajuveen", "Поверхностная средняя мозговая вена"], ["Vena thalamostriata superior", "Ülemine talamostriaalveen", "Верхняя таламостриарная вена"], ["Ventriculi cerebri", "Ajuvatsakesed", "Желудочки головного мозга"], ["Ventriculus lateralis", "Külgvatsake", "Боковой желудочек"], ["Ventriculus quartus", "Neljas vatsake", "Четвёртый желудочек"], ["Ventriculus tertius", "Kolmas vatsake", "Третий желудочек"], ["Vermis cerebelli", "Väikeajuuss", "Червь мозжечка"], ["Vertex", "Pealagi", "Темя (макушка)"], ["Vestibulum nasi", "Ninaesik", "Преддверие носа"], ["Vomer", "Sahkluu", "Сошник"]];
 
         // Merge duplicate Latin synonyms into single glossary entries with aliases
         const SYNONYM_MERGES = {
@@ -1310,7 +1422,6 @@
                 s.onload = () => resolve();
                 s.onerror = () => {
                     if (integrity) {
-                        // Fallback without integrity if CDN sub-version changed
                         const s2 = document.createElement('script');
                         s2.src = src;
                         s2.async = true;
@@ -1398,6 +1509,10 @@
         const zoomOutBtn = document.getElementById('zoomOutBtn');
         const brightnessRange = document.getElementById('brightnessRange');
         const contrastRange = document.getElementById('contrastRange');
+        const brightnessRangeMobile = document.getElementById('brightnessRangeMobile');
+        const contrastRangeMobile = document.getElementById('contrastRangeMobile');
+        const mobileAdjustBtn = document.getElementById('mobileAdjustBtn');
+        const mobileAdjustBar = document.getElementById('mobileAdjustBar');
         const invertBtn = document.getElementById('invertBtn');
         const pixelatedBtn = document.getElementById('pixelatedBtn');
         const resetBtn = document.getElementById('resetBtn');
@@ -1406,6 +1521,7 @@
 
         const sidebar = document.getElementById('sidebar');
         const toggleGlossaryBtn = document.getElementById('toggleGlossaryBtn');
+        const closeSidebarMobileBtn = document.getElementById('closeSidebarMobileBtn');
         const searchInput = document.getElementById('searchInput');
         const clearSearchBtn = document.getElementById('clearSearchBtn');
         const glossaryList = document.getElementById('glossaryList');
@@ -1948,10 +2064,11 @@
 
             if (specificPlane && planes[specificPlane].images.length > 0) {
                 const st = planes[specificPlane];
-                const nextIdx = Math.min(Math.max(st.index + delta, 0), st.images.length - 1);
+                const prevIdx = st.index;
+                const nextIdx = Math.min(Math.max(prevIdx + delta, 0), st.images.length - 1);
                 if (activePlane !== specificPlane) switchPlane(specificPlane, false);
                 showSliceForPlane(specificPlane, nextIdx);
-                return nextIdx !== st.index;
+                return nextIdx !== prevIdx;
             }
 
             const nonEmptyPlanes = PLANE_ORDER.filter(p => planes[p].images.length > 0);
@@ -2007,6 +2124,36 @@
             zoomLabel.textContent = `${Math.round(viewState.scale * 100)}%`;
         }
 
+        // Unified focal-point zoom helper (keeps focal point stationary under cursor/fingers)
+        function zoomAtClientPoint(targetScale, clientX = null, clientY = null, planeHint = null) {
+            const clampedScale = Math.min(Math.max(targetScale, 0.5), 15);
+            if (clampedScale === viewState.scale) return;
+
+            if (clampedScale <= 1) {
+                viewState.scale = clampedScale;
+                viewState.panX = 0;
+                viewState.panY = 0;
+                updateTransform();
+                return;
+            }
+
+            const ratio = clampedScale / viewState.scale;
+            if (clientX !== null && clientY !== null) {
+                const refPlane = planeHint || findPlaneAtPoint(clientX, clientY) || activePlane;
+                const rect = paneElements[refPlane].pane.getBoundingClientRect();
+                const offsetX = clientX - rect.left - rect.width / 2;
+                const offsetY = clientY - rect.top - rect.height / 2;
+                viewState.panX = offsetX - (offsetX - viewState.panX) * ratio;
+                viewState.panY = offsetY - (offsetY - viewState.panY) * ratio;
+            } else {
+                viewState.panX *= ratio;
+                viewState.panY *= ratio;
+            }
+
+            viewState.scale = clampedScale;
+            updateTransform();
+        }
+
         function updateFilters() {
             const isDefault = brightness === 100 && contrast === 100 && !inverted;
             const filterStr = isDefault
@@ -2030,6 +2177,8 @@
             inverted = false;
             brightnessRange.value = 100;
             contrastRange.value = 100;
+            brightnessRangeMobile.value = 100;
+            contrastRangeMobile.value = 100;
             invertBtn.classList.remove('active');
             updateTransform();
             updateFilters();
@@ -2404,7 +2553,11 @@
             return new Promise(resolve => {
                 const img = new Image();
                 img.onload = () => {
-                    const scale = img.width < 1400 ? 1.5 : 1.0;
+                    if (img.width >= 1400) {
+                        resolve(url);
+                        return;
+                    }
+                    const scale = 1.5;
                     const canvas = document.createElement('canvas');
                     canvas.width = Math.round(img.width * scale);
                     canvas.height = Math.round(img.height * scale);
@@ -2412,7 +2565,11 @@
                     ctx.imageSmoothingEnabled = true;
                     ctx.imageSmoothingQuality = 'high';
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    canvas.toBlob(blob => resolve(blob || url), 'image/png');
+                    canvas.toBlob(blob => {
+                        canvas.width = 0;
+                        canvas.height = 0;
+                        resolve(blob || url);
+                    }, 'image/png');
                 };
                 img.onerror = () => resolve(url);
                 img.src = url;
@@ -2488,7 +2645,7 @@
                                     for (let a = 0; a < lines.length; a++) {
                                         for (let b = a + 1; b < lines.length; b++) {
                                             const dy = lines[b].bbox.y0 - lines[a].bbox.y1;
-                                            if (dy > 36) break; // Early exit since lines are sorted by y0
+                                            if (dy > 36) break;
                                             const dx = Math.abs(lines[b].bbox.x0 - lines[a].bbox.x0);
                                             if (dy >= -8 && dx <= 140) {
                                                 reconstructedLines += ' ' + lines[a].text + ' ' + lines[b].text;
@@ -2614,6 +2771,12 @@
         toggleGlossaryBtn.addEventListener('click', () => {
             const collapsed = sidebar.classList.toggle('collapsed');
             toggleGlossaryBtn.classList.toggle('active', !collapsed);
+        });
+
+        closeSidebarMobileBtn.addEventListener('click', () => {
+            sidebar.classList.add('collapsed');
+            toggleGlossaryBtn.classList.remove('active');
+            searchInput.blur();
         });
 
         exportLinksBtn.addEventListener('click', () => {
@@ -2785,10 +2948,15 @@
             loupeImg.style.left = `${LOUPE_RADIUS - relX * LOUPE_ZOOM}px`;
             loupeImg.style.top = `${LOUPE_RADIUS - relY * LOUPE_ZOOM}px`;
 
-            // Offset upward slightly on touch so finger doesn't cover the loupe
-            const touchOffsetY = loupeState.isTouch ? -64 : 0;
-            loupe.style.left = `${clientX - LOUPE_RADIUS}px`;
-            loupe.style.top = `${clientY - LOUPE_RADIUS + touchOffsetY}px`;
+            // Offset upward on touch so thumb/finger doesn't cover the loupe, clamped to screen bounds
+            const touchOffsetY = loupeState.isTouch ? -112 : 0;
+            const maxLeft = window.innerWidth - LOUPE_SIZE - 6;
+            const maxTop = window.innerHeight - LOUPE_SIZE - 6;
+            const clampedLeft = Math.min(Math.max(6, clientX - LOUPE_RADIUS), Math.max(6, maxLeft));
+            const clampedTop = Math.min(Math.max(6, clientY - LOUPE_RADIUS + touchOffsetY), Math.max(6, maxTop));
+
+            loupe.style.left = `${clampedLeft}px`;
+            loupe.style.top = `${clampedTop}px`;
         }
 
         function hideLoupe() {
@@ -2811,18 +2979,7 @@
 
             if (e.ctrlKey || e.metaKey) {
                 const zoomFactor = Math.exp(-normDelta * 0.002);
-                const newScale = Math.min(Math.max(viewState.scale * zoomFactor, 0.5), 15);
-
-                const targetPaneEl = paneElements[hoveredPlane].pane;
-                const rect = targetPaneEl.getBoundingClientRect();
-                const cursorX = e.clientX - rect.left - rect.width / 2;
-                const cursorY = e.clientY - rect.top - rect.height / 2;
-
-                viewState.panX = cursorX - (cursorX - viewState.panX) * (newScale / viewState.scale);
-                viewState.panY = cursorY - (cursorY - viewState.panY) * (newScale / viewState.scale);
-                viewState.scale = newScale;
-
-                updateTransform();
+                zoomAtClientPoint(viewState.scale * zoomFactor, e.clientX, e.clientY, hoveredPlane);
                 if (loupeState.active) updateLoupePosition(e.clientX, e.clientY);
             } else {
                 stopPlay();
@@ -2874,7 +3031,7 @@
 
         window.addEventListener('blur', hideLoupe);
 
-        // Mobile Touch Gestures (Double-Tap without swipe conflict + Long-Press 3x Loupe)
+        // Mobile Touch Gestures (Focal Pinch-Zoom, Double-Tap at Point, Long-Press 3x Loupe)
         let touchMode = null;
         let touchStartX = 0;
         let touchStartY = 0;
@@ -2882,9 +3039,12 @@
         let touchStartPanY = 0;
         let touchMoved = false;
         let lastSwipeStep = 0;
-        let initialPinchDist = 0;
-        let initialPinchScale = 1;
+        let lastPinchDist = 0;
+        let lastPinchMidX = 0;
+        let lastPinchMidY = 0;
         let lastCleanTapTime = 0;
+        let lastCleanTapX = 0;
+        let lastCleanTapY = 0;
         let longPressTimer = null;
 
         function clearLongPressTimer() {
@@ -2901,6 +3061,13 @@
         viewport.addEventListener('touchstart', e => {
             if (e.target.closest('.pane-footer') || e.target.closest('.drop-overlay')) return;
             if (!hasAnyLoadedSlices()) return;
+
+            // Auto-close mobile glossary sheet when user touches the CT viewport
+            if (window.innerWidth <= 820 && !sidebar.classList.contains('collapsed')) {
+                sidebar.classList.add('collapsed');
+                toggleGlossaryBtn.classList.remove('active');
+                searchInput.blur();
+            }
 
             clearLongPressTimer();
 
@@ -2925,12 +3092,9 @@
                 hideLoupe();
                 touchMode = 'pinch';
                 touchMoved = true;
-                initialPinchDist = getTouchDistance(e.touches[0], e.touches[1]);
-                initialPinchScale = viewState.scale;
-                touchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                touchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                touchStartPanX = viewState.panX;
-                touchStartPanY = viewState.panY;
+                lastPinchDist = getTouchDistance(e.touches[0], e.touches[1]);
+                lastPinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                lastPinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
             }
         }, { passive: false });
 
@@ -2949,20 +3113,31 @@
                 const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
                 const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
 
-                viewState.scale = Math.min(Math.max(initialPinchScale * (dist / initialPinchDist), 0.5), 12);
-                viewState.panX = touchStartPanX + (midX - touchStartX);
-                viewState.panY = touchStartPanY + (midY - touchStartY);
-                updateTransform();
+                if (lastPinchDist > 0) {
+                    const scaleFactor = dist / lastPinchDist;
+                    zoomAtClientPoint(viewState.scale * scaleFactor, midX, midY, activePlane);
+                }
+
+                if (viewState.scale > 1) {
+                    viewState.panX += (midX - lastPinchMidX);
+                    viewState.panY += (midY - lastPinchMidY);
+                    updateTransform();
+                }
+
+                lastPinchDist = dist;
+                lastPinchMidX = midX;
+                lastPinchMidY = midY;
             } else if (touchMode === 'single' && e.touches.length === 1) {
                 const dx = e.touches[0].clientX - touchStartX;
                 const dy = e.touches[0].clientY - touchStartY;
 
-                if (Math.hypot(dx, dy) > 10) {
+                if (Math.hypot(dx, dy) > 8) {
                     touchMoved = true;
                     clearLongPressTimer();
                 }
 
-                if (viewState.scale > 1.05 || Math.abs(viewState.panX) > 5 || Math.abs(viewState.panY) > 5) {
+                // Pan when zoomed in; swipe vertically to scroll slices when at 1x
+                if (viewState.scale > 1.02) {
                     viewState.panX = touchStartPanX + dx;
                     viewState.panY = touchStartPanY + dy;
                     updateTransform();
@@ -2985,21 +3160,41 @@
                 touchMode = null;
                 return;
             }
+
+            // Seamless transition from 2-finger pinch to 1-finger pan
+            if (touchMode === 'pinch' && e.touches.length === 1) {
+                touchMode = 'single';
+                touchMoved = true;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchStartPanX = viewState.panX;
+                touchStartPanY = viewState.panY;
+                return;
+            }
+
             if (touchMode === 'single' && !touchMoved && e.changedTouches.length === 1) {
                 const now = Date.now();
-                if (now - lastCleanTapTime < 280) {
-                    viewState.scale = viewState.scale > 1.2 ? 1 : 2.5;
-                    if (viewState.scale === 1) {
-                        viewState.panX = 0;
-                        viewState.panY = 0;
+                const tapX = e.changedTouches[0].clientX;
+                const tapY = e.changedTouches[0].clientY;
+                const distFromLastTap = Math.hypot(tapX - lastCleanTapX, tapY - lastCleanTapY);
+
+                if (now - lastCleanTapTime < 280 && distFromLastTap < 36) {
+                    if (viewState.scale > 1.15) {
+                        zoomAtClientPoint(1);
+                    } else {
+                        zoomAtClientPoint(2.5, tapX, tapY, activePlane);
                     }
-                    updateTransform();
                     lastCleanTapTime = 0;
                 } else {
                     lastCleanTapTime = now;
+                    lastCleanTapX = tapX;
+                    lastCleanTapY = tapY;
                 }
             }
-            touchMode = null;
+
+            if (e.touches.length === 0) {
+                touchMode = null;
+            }
         });
 
         viewport.addEventListener('touchcancel', () => {
@@ -3023,23 +3218,35 @@
         });
 
         zoomInBtn.addEventListener('click', () => {
-            viewState.scale = Math.min(viewState.scale * 1.25, 15);
-            updateTransform();
+            zoomAtClientPoint(viewState.scale * 1.25);
         });
 
         zoomOutBtn.addEventListener('click', () => {
-            viewState.scale = Math.max(viewState.scale / 1.25, 0.5);
-            updateTransform();
+            zoomAtClientPoint(viewState.scale / 1.25);
         });
 
-        brightnessRange.addEventListener('input', e => {
-            brightness = Number(e.target.value);
+        function setBrightness(val) {
+            brightness = Number(val);
+            brightnessRange.value = brightness;
+            brightnessRangeMobile.value = brightness;
             updateFilters();
-        });
+        }
 
-        contrastRange.addEventListener('input', e => {
-            contrast = Number(e.target.value);
+        function setContrast(val) {
+            contrast = Number(val);
+            contrastRange.value = contrast;
+            contrastRangeMobile.value = contrast;
             updateFilters();
+        }
+
+        brightnessRange.addEventListener('input', e => setBrightness(e.target.value));
+        brightnessRangeMobile.addEventListener('input', e => setBrightness(e.target.value));
+        contrastRange.addEventListener('input', e => setContrast(e.target.value));
+        contrastRangeMobile.addEventListener('input', e => setContrast(e.target.value));
+
+        mobileAdjustBtn.addEventListener('click', () => {
+            const visible = mobileAdjustBar.classList.toggle('visible');
+            mobileAdjustBtn.classList.toggle('active', visible);
         });
 
         invertBtn.addEventListener('click', () => {
@@ -3123,11 +3330,9 @@
             } else if (e.key === 'r' || e.key === 'R') {
                 resetView();
             } else if (e.key === '+' || e.key === '=') {
-                viewState.scale = Math.min(viewState.scale * 1.2, 15);
-                updateTransform();
+                zoomAtClientPoint(viewState.scale * 1.2);
             } else if (e.key === '-') {
-                viewState.scale = Math.max(viewState.scale / 1.2, 0.5);
-                updateTransform();
+                zoomAtClientPoint(viewState.scale / 1.2);
             }
         });
 
